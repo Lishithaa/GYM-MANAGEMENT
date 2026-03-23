@@ -236,6 +236,23 @@ async def get_current_user(
     
     return user
 
+@api_router.post("/auth/set-role")
+async def set_role(request: Request, role: dict):
+    cookie_token = request.cookies.get("session_token")
+    if not cookie_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": cookie_token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    await db.users.update_one(
+        {"user_id": session["user_id"]},
+        {"$set": {"role": role["role"]}}
+    )
+    
+    return {"message": "Role updated"}
+
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):
     cookie_token = request.cookies.get("session_token")
@@ -612,6 +629,126 @@ async def get_admin_stats(
         "total_bookings": total_bookings,
         "city_stats": city_stats
     }
+
+@api_router.get("/admin/stats")
+async def get_admin_stats(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    cookie_token = request.cookies.get("session_token")
+    token = get_user_from_token(authorization, cookie_token)
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if not user or user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    total_gyms = await db.gyms.count_documents({"approved": True})
+    total_trainers = await db.trainers.count_documents({"approved": True})
+    total_bookings = await db.bookings.count_documents({})
+    
+    city_stats = []
+    for city in CITIES_AREAS.keys():
+        gym_count = await db.gyms.count_documents({"city": city, "approved": True})
+        booking_count = await db.bookings.count_documents({})
+        city_stats.append({
+            "city": city,
+            "gyms": gym_count,
+            "bookings": booking_count
+        })
+    
+    return {
+        "total_gyms": total_gyms,
+        "total_trainers": total_trainers,
+        "total_bookings": total_bookings,
+        "city_stats": city_stats
+    }
+
+@api_router.get("/gym-owner/my-gym")
+async def get_my_gym(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    cookie_token = request.cookies.get("session_token")
+    token = get_user_from_token(authorization, cookie_token)
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    gym = await db.gyms.find_one({"owner_id": session["user_id"]}, {"_id": 0})
+    return gym
+
+@api_router.get("/gym-owner/bookings")
+async def get_gym_owner_bookings(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    cookie_token = request.cookies.get("session_token")
+    token = get_user_from_token(authorization, cookie_token)
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    gym = await db.gyms.find_one({"owner_id": session["user_id"]}, {"_id": 0})
+    if not gym:
+        return []
+    
+    bookings = await db.bookings.find({"target_id": gym["gym_id"], "target_type": "gym"}, {"_id": 0}).to_list(1000)
+    return bookings
+
+@api_router.get("/trainer/my-profile")
+async def get_my_trainer_profile(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    cookie_token = request.cookies.get("session_token")
+    token = get_user_from_token(authorization, cookie_token)
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    trainer = await db.trainers.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    return trainer
+
+@api_router.get("/trainer/bookings")
+async def get_trainer_bookings(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    cookie_token = request.cookies.get("session_token")
+    token = get_user_from_token(authorization, cookie_token)
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    trainer = await db.trainers.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if not trainer:
+        return []
+    
+    bookings = await db.bookings.find({"target_id": trainer["trainer_id"], "target_type": "trainer"}, {"_id": 0}).to_list(1000)
+    return bookings
 
 app.include_router(api_router)
 

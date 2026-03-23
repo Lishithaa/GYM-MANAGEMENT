@@ -34,7 +34,22 @@ const AuthCallback = () => {
         );
 
         setUser(response.data.user);
-        navigate('/dashboard', { state: { user: response.data.user }, replace: true });
+        
+        // If user doesn't have a role, redirect to role selection
+        if (!response.data.user.role || response.data.user.role === 'user') {
+          navigate('/role-selection', { state: { userData: response.data.user }, replace: true });
+        } else {
+          // Redirect based on role
+          const dashboardMap = {
+            gym_owner: '/gym-owner/dashboard',
+            trainer: '/trainer/dashboard',
+            admin: '/admin'
+          };
+          navigate(dashboardMap[response.data.user.role] || '/dashboard', { 
+            state: { user: response.data.user }, 
+            replace: true 
+          });
+        }
       } catch (error) {
         console.error('Session exchange failed:', error);
         navigate('/login');

@@ -30,7 +30,14 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   }
 
   if (roles.length > 0 && !roles.includes(user?.role)) {
-    return <Navigate to="/dashboard" replace />;
+    // Redirect to user's appropriate dashboard
+    const dashboardMap = {
+      user: '/dashboard',
+      gym_owner: '/gym-owner/dashboard',
+      trainer: '/trainer/dashboard',
+      admin: '/admin'
+    };
+    return <Navigate to={dashboardMap[user?.role] || '/dashboard'} replace />;
   }
 
   return children;

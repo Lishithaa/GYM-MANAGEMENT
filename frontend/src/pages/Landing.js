@@ -125,6 +125,25 @@ const Landing = () => {
         </div>
       </section>
 
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto text-center">
+          <h2 className="text-4xl font-bold font-['Outfit'] tracking-tight mb-6">
+            Are you a Gym Owner or Trainer?
+          </h2>
+          <p className="text-lg font-['Manrope'] text-zinc-600 mb-8">
+            Join HourlyGym to list your gym or offer training sessions
+          </p>
+          <Button
+            onClick={() => navigate('/login')}
+            size="lg"
+            className="bg-black text-white hover:bg-zinc-800 rounded-md px-8"
+            data-testid="partner-login-button"
+          >
+            Partner Login
+          </Button>
+        </div>
+      </section>
+
       <footer className="bg-zinc-900 text-white py-12 px-6">
         <div className="max-w-7xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
