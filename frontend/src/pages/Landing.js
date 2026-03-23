@@ -151,7 +151,7 @@ const Landing = () => {
             <span className="text-xl font-bold font-['Outfit']">HourlyGym</span>
           </div>
           <p className="text-zinc-400 font-['Manrope']">
-            © 2024 HourlyGym. Flexible fitness across India.
+            © 2026 HourlyGym. Flexible fitness across India.
           </p>
         </div>
       </footer>
