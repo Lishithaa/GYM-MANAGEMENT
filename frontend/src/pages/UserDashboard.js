@@ -225,10 +225,11 @@ const UserDashboard = () => {
       </div>
 
       <Dialog open={showReview} onOpenChange={setShowReview}>
-        <DialogContent data-testid="review-dialog">
+        <DialogContent data-testid="review-dialog" aria-describedby="review-dialog-description">
           <DialogHeader>
             <DialogTitle>Rate & Review</DialogTitle>
           </DialogHeader>
+          <p id="review-dialog-description" className="sr-only">Rate your experience and leave a review</p>
           <div className="space-y-4">
             <div>
               <Label>Rating</Label>

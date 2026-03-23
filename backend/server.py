@@ -411,7 +411,12 @@ async def create_booking(
     }
     
     await db.bookings.insert_one(booking_doc)
-    return Booking(**booking_doc)
+    
+    response = JSONResponse(
+        content=Booking(**booking_doc).model_dump(mode='json'),
+        status_code=201
+    )
+    return response
 
 @api_router.get("/bookings", response_model=List[Booking])
 async def get_bookings(
@@ -488,7 +493,11 @@ async def create_review(
         {"$set": {"rating": round(avg_rating, 1), "reviews_count": len(all_reviews)}}
     )
     
-    return Review(**review_doc)
+    response = JSONResponse(
+        content=Review(**review_doc).model_dump(mode='json'),
+        status_code=201
+    )
+    return response
 
 @api_router.get("/reviews/{target_type}/{target_id}", response_model=List[Review])
 async def get_reviews(target_type: str, target_id: str):

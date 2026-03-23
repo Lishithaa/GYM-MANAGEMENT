@@ -26,8 +26,12 @@ const Gyms = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCity) {
+    if (selectedCity && selectedCity !== '_all') {
+      setSelectedArea('');
       fetchAreas(selectedCity);
+    } else {
+      setAreas([]);
+      setSelectedArea('');
     }
   }, [selectedCity]);
 

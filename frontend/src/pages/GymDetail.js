@@ -277,10 +277,11 @@ const GymDetail = () => {
       </div>
 
       <Dialog open={showBooking} onOpenChange={setShowBooking}>
-        <DialogContent data-testid="booking-dialog">
+        <DialogContent data-testid="booking-dialog" aria-describedby="booking-dialog-description">
           <DialogHeader>
             <DialogTitle>Book {gym.name}</DialogTitle>
           </DialogHeader>
+          <p id="booking-dialog-description" className="sr-only">Select date and time to book this gym</p>
           <div className="space-y-4">
             <div>
               <Label htmlFor="date">Date</Label>
