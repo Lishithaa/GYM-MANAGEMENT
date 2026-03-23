@@ -1,0 +1,127 @@
+{
+  "theme": "light",
+  "typography": {
+    "headings": {
+      "font_family": "Outfit",
+      "weights": [700, 900],
+      "rules": "Must use tracking-tight or tracking-tighter for text-3xl and above. DO NOT use generic Inter for headings."
+    },
+    "body": {
+      "font_family": "Manrope",
+      "weights": [400, 500, 600],
+      "rules": "Leading-relaxed for better legibility."
+    },
+    "labels_overlines": {
+      "rules": "Uppercase, tiny text (text-xs), tracking-[0.2em] (wide spacing). Use for 'CITY', 'AREA', 'AMENITIES' labels."
+    }
+  },
+  "colors": {
+    "archetype": "THE PERFORMANCE PRO (Minimal Variant)",
+    "primary_background": "#FFFFFF",
+    "secondary_background": "#F9FAFB",
+    "dark_anchor": "#0A0A0A",
+    "accent": "#007AFF",
+    "border_color": "#E5E7EB",
+    "text_primary": "#0A0A0A",
+    "text_secondary": "#4B5563",
+    "rules": "Use high contrast. Rely on 1px solid strokes or 2px Inner Glow instead of soft shadows. Avoid pure #000000 or #808080 (always tint slightly with cool/blue tones, e.g., Slate/Zinc). Do not use Teal or Purple."
+  },
+  "visual_enhancers": {
+    "borders": "1px solid crisp borders (border-zinc-200) for structural division.",
+    "shadows": "Minimalist tactical shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05). Hover states should feature slight lift (-translate-y-1) and crisp shadow.",
+    "glassmorphism": "Only for sticky nav headers: bg-white/80, backdrop-blur-md, border-b border-zinc-200. NO complete transparency.",
+    "textures": "Subtle noise overlay on the hero section background to avoid 'digital flatness'."
+  },
+  "component_name": {
+    "buttons": "Sharp rectangular or slightly rounded (rounded-md). Primary CTA (e.g., 'Book Gym'): bg-black text-white hover:bg-zinc-800. Accent CTA: bg-blue-600 text-white hover:bg-blue-700.",
+    "cards": "Flat, 1px solid border (border-zinc-200), no default shadow. Padding: p-6 or p-8. Hover: subtle lift and shadow.",
+    "inputs": "Shadcn UI defaults but with rounded-md, border-zinc-300, focus:border-black focus:ring-1 focus:ring-black.",
+    "qr_code_display": "Generous padding (p-8), white background, centered layout with a crisp 1px border and slight shadow to ensure scannability."
+  },
+  "grids": {
+    "marketing": "MODE A: The 'Tetris' Grid for landing pages. grid-cols-1 md:grid-cols-12, wide gaps (gap-8). Asymmetric spans.",
+    "dashboards": "MODE B: High Density Grid. grid-cols-1 md:grid-cols-3 lg:grid-cols-4, gap-4 or gap-6. Every pixel utilized. h-full stretch for analytics cards and bookings lists."
+  },
+  "layouts": {
+    "spacing": "Generous spacing. Use p-8, p-12, p-16, py-24. Containers with borders MUST have internal padding (p-6/p-8) to prevent collision.",
+    "alignment": "Left-align paragraphs, inputs, labels. Avoid center-everything disease.",
+    "mobile_images": "max-h-[80vh] md:max-h-none."
+  },
+  "motion": {
+    "hover_states": "All interactive elements must have clear hover state (e.g., hover:bg-black/90 hover:text-white). Transition specific properties, DO NOT use transition-all.",
+    "entrance": "Staggered fade-up for lists and grid items (like gym search results).",
+    "click": "scale-95 or scale-98 active state."
+  },
+  "accessibility": {
+    "contrast": "Text below 18px must have 4.5:1 ratio. Large text 3:1. Explicit text color on hover.",
+    "focus": "MUST have high contrast focus ring (focus:ring-2 focus:ring-black focus:outline-none).",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "media": {
+    "rules": "Zoom in. Use close-ups and bold focus on essential details to create intimacy. Use high-quality imagery for gym profiles."
+  },
+  "3d_libraries": {
+    "usage": "Use minimalist visual graphs in dashboards (Recharts/Shadcn). Avoid heavy 3D unless for specific hero interactives (not strictly needed for clean marketplace). Stick to 2D tactical layout."
+  },
+  "image_urls": [
+    {
+      "category": "Gym Interior / Browse",
+      "url": "https://images.unsplash.com/photo-1761971975769-97e598bf526b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBneW0lMjBpbnRlcmlvcnxlbnwwfHx8fDE3NzQyODE2NzJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern gym with treadmills"
+    },
+    {
+      "category": "Gym Interior / Details",
+      "url": "https://images.pexels.com/photos/4716816/pexels-photo-4716816.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Spacious indoor gym with wooden floor"
+    },
+    {
+      "category": "Trainer Portrait / Browse",
+      "url": "https://images.unsplash.com/photo-1628935291759-bbaf33a66dc6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwyfHxmaXRuZXNzJTIwdHJhaW5lciUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NDI4MTY5Nnww&ixlib=rb-4.1.0&q=85",
+      "description": "Man in blue t-shirt on bench press"
+    },
+    {
+      "category": "Trainer Portrait / Hero",
+      "url": "https://images.unsplash.com/photo-1750698545009-679820502908?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHw0fHxmaXRuZXNzJTIwdHJhaW5lciUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NDI4MTY5Nnww&ixlib=rb-4.1.0&q=85",
+      "description": "Gym coach posing hands on hips"
+    },
+    {
+      "category": "Trainer Portrait / Details",
+      "url": "https://images.pexels.com/photos/11241445/pexels-photo-11241445.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Strong bearded man, intense focus"
+    }
+  ],
+  "component_path": {
+    "shadcn": "/app/frontend/src/components/ui/"
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the 'Performance Pro' minimal color palette: #0A0A0A (Obsidian base for dark elements), #FFFFFF (White base), #007AFF (Volt Blue) as accent CTA color.",
+    "Setup 'Outfit' for headings and 'Manrope' for body text via Google Fonts and map them in tailwind.config.js.",
+    "Implement Shadcn UI for forms, inputs, tables, but restyle them to have crisp 1px borders instead of the default soft Vercel aesthetic. Override default Shadcn radii if needed.",
+    "For the marketing/landing page, use custom raw HTML+Tailwind with generous spacing (py-24, gap-12). Avoid Shadcn layout sections for marketing pages.",
+    "For dashboards (User, Trainer, Gym, Admin), implement a High-Density Grid layout, utilizing every pixel. Remove massive paddings inside data tables.",
+    "Add 'data-testid' to all buttons, links, and forms for automated testing (CRITICAL).",
+    "Never use pure transparent backgrounds for overlays or sticky headers. Always apply a backdrop blur and background tint (e.g., bg-white/80 backdrop-blur-md).",
+    "Use Lucide-react for all icons. Ensure line weight matches font weight (usually 1.5 or 2).",
+    "Ensure UI layout accounts for displaying a generated QR code clearly in the booking completion and details screens.",
+    "Mock data properly. Ensure places like Hyderabad, Bangalore, Guntur are used in location selectors.",
+    "Work with .js/.jsx files as specified. Do not use TypeScript extensions for frontend files unless strictly required by backend."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) where content scrolls under.",
+    "You MUST NOT apply universal transition. Eg: 'transition: all'. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add '.App { text-align: center; }' in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN.",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use `sonner` for toasts. Sonner components are located in `/app/frontend/src/components/ui/sonner.js`"
+  ]
+}
