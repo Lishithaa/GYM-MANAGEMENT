@@ -23,7 +23,9 @@ class Settings:
     FRONTEND_URL: str       = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     PUBLIC_BACKEND_URL: str = os.environ.get("PUBLIC_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
     CORS_ORIGINS: list      = [o.strip() for o in os.environ.get(
-        "CORS_ORIGINS", "http://localhost:3000"
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002",
     ).split(",") if o.strip()]
 
 

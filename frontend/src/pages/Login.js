@@ -38,7 +38,12 @@ const Login = () => {
       };
       navigate(dashboardMap[loggedInUser?.role] || '/dashboard');
     } catch (error) {
-      const message = error?.response?.data?.detail || 'Login failed';
+      const detail = error?.response?.data?.detail;
+      const message =
+        detail ||
+        (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error'
+          ? 'Cannot reach API. Is the backend running on port 8000 and REACT_APP_BACKEND_URL correct?'
+          : error?.message || 'Login failed');
       toast.error(message);
     } finally {
       setSubmitting(false);

@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dumbbell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API } from '@/config';
 
 const BookingDetail = () => {
   const { id } = useParams();
@@ -16,11 +14,7 @@ const BookingDetail = () => {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchBooking();
-  }, [id]);
-
-  const fetchBooking = async () => {
+  const fetchBooking = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/bookings/${id}`, {
         withCredentials: true
@@ -31,7 +25,11 @@ const BookingDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchBooking();
+  }, [fetchBooking]);
 
   if (loading) {
     return (

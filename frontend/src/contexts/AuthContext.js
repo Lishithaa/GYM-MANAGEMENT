@@ -1,10 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { API } from '@/config';
 
 const AuthContext = createContext();
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -47,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
     setAxiosAuthHeader(token);
     try {
-      const response = await axios.get(`${API}/auth/me`);
+      const response = await axios.get(`${API}/auth/me`, { timeout: 12000 });
       setUser(response.data);
     } catch (error) {
       const renewed = await refreshAccessToken();
@@ -55,7 +53,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
       } else {
         try {
-          const response = await axios.get(`${API}/auth/me`);
+          const response = await axios.get(`${API}/auth/me`, { timeout: 12000 });
           setUser(response.data);
         } catch (_e) {
           setUser(null);
@@ -71,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   }, [checkAuth]);
 
   const login = async (email, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email, password });
+    const response = await axios.post(`${API}/auth/login`, { email, password }, { timeout: 20000 });
     const { access_token: accessToken, refresh_token: refreshToken, user: userData } = response.data;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);

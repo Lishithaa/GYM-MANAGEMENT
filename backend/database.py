@@ -6,17 +6,21 @@ from config import settings
 
 
 def _build_engine():
+    # connect_timeout avoids hanging forever when DB is unreachable (VPN, firewall, wrong IP allowlist).
+    connect_args: dict = {"connect_timeout": 15}
     kwargs: dict = {
         "pool_pre_ping": True,
         "pool_size": 10,
         "max_overflow": 20,
         "echo": False,
+        "pool_timeout": 30,
     }
     if settings.MYSQL_SSL_ENABLED and settings.DATABASE_URL:
         ctx = ssl_lib.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl_lib.CERT_NONE
-        kwargs["connect_args"] = {"ssl": ctx}
+        connect_args["ssl"] = ctx
+    kwargs["connect_args"] = connect_args
     return create_async_engine(settings.DATABASE_URL, **kwargs)
 
 

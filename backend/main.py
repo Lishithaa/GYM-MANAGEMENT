@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -21,8 +22,20 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Creating database tables…")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+
+    async def _create_tables():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        await asyncio.wait_for(_create_tables(), timeout=45.0)
+    except asyncio.TimeoutError:
+        logger.error(
+            "Database init timed out after 45s. Check DATABASE_URL, VPN, and MySQL "
+            "firewall (DigitalOcean: Trusted Sources must include your current IP)."
+        )
+        raise RuntimeError("Database connection timed out") from None
+
     logger.info("Database ready.")
     yield
     await engine.dispose()

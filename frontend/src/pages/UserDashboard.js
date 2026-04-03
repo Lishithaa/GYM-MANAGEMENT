@@ -10,9 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Dumbbell, Calendar, LogOut, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API } from '@/config';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
