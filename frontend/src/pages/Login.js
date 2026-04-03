@@ -1,13 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dumbbell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -15,10 +21,28 @@ const Login = () => {
     }
   }, [user, navigate]);
 
-  const handleGoogleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/role-selection';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error('Please enter email and password');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const loggedInUser = await login(email, password);
+      const dashboardMap = {
+        gym_owner: '/gym-owner/dashboard',
+        trainer: '/trainer/dashboard',
+        admin: '/admin',
+        user: '/dashboard'
+      };
+      navigate(dashboardMap[loggedInUser?.role] || '/dashboard');
+    } catch (error) {
+      const message = error?.response?.data?.detail || 'Login failed';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -34,17 +58,46 @@ const Login = () => {
             Welcome Back
           </h2>
           <p className="text-center text-zinc-600 font-['Manrope'] mb-8">
-            Sign in to book gyms and trainers
+            Sign in to book trainers
           </p>
 
-          <Button
-            onClick={handleGoogleLogin}
-            className="w-full bg-black text-white hover:bg-zinc-800 rounded-md"
-            size="lg"
-            data-testid="google-login-button"
-          >
-            Continue with Google
-          </Button>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                data-testid="email-input"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                data-testid="password-input"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-black text-white hover:bg-zinc-800 rounded-md"
+              size="lg"
+              data-testid="email-login-button"
+              disabled={submitting}
+            >
+              {submitting ? 'Signing in...' : 'Sign in'}
+            </Button>
+          </form>
 
           <p className="text-center text-sm text-zinc-500 font-['Manrope'] mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy

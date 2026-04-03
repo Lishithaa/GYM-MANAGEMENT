@@ -40,9 +40,6 @@ const Trainers = () => {
             <span className="text-2xl font-bold font-['Outfit'] tracking-tight">HourlyGym</span>
           </Link>
           <div className="flex items-center gap-6">
-            <Link to="/gyms" className="text-sm font-medium hover:text-blue-600 transition-colors" data-testid="nav-gyms-link">
-              Gyms
-            </Link>
             <Link to="/trainers" className="text-sm font-medium text-blue-600" data-testid="nav-trainers-link">
               Trainers
             </Link>

@@ -17,9 +17,6 @@ const Landing = () => {
             <span className="text-2xl font-bold font-['Outfit'] tracking-tight">HourlyGym</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link to="/gyms" className="text-sm font-medium hover:text-blue-600 transition-colors" data-testid="nav-gyms-link">
-              Gyms
-            </Link>
             <Link to="/trainers" className="text-sm font-medium hover:text-blue-600 transition-colors" data-testid="nav-trainers-link">
               Trainers
             </Link>
@@ -52,25 +49,16 @@ const Landing = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="text-6xl font-bold font-['Outfit'] tracking-tighter text-zinc-900 mb-6">
-                Book Gyms & Trainers by the Hour
+                Book Trainers by the Hour
               </h1>
               <p className="text-lg font-['Manrope'] leading-relaxed text-zinc-600 mb-8">
-                Flexible fitness on your schedule. Access premium gyms and certified trainers across Hyderabad, Bangalore, and Guntur.
+                Flexible fitness on your schedule. Access certified trainers across Hyderabad, Bangalore, and Guntur.
               </p>
               <div className="flex gap-4">
                 <Button
-                  onClick={() => navigate('/gyms')}
-                  size="lg"
-                  className="bg-blue-600 text-white hover:bg-blue-700 rounded-md px-8"
-                  data-testid="hero-browse-gyms-button"
-                >
-                  Browse Gyms
-                </Button>
-                <Button
                   onClick={() => navigate('/trainers')}
                   size="lg"
-                  variant="outline"
-                  className="border-zinc-300 rounded-md px-8"
+                  className="bg-blue-600 text-white hover:bg-blue-700 rounded-md px-8"
                   data-testid="hero-browse-trainers-button"
                 >
                   Find Trainers
@@ -128,10 +116,10 @@ const Landing = () => {
       <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className="text-4xl font-bold font-['Outfit'] tracking-tight mb-6">
-            Are you a Gym Owner or Trainer?
+            Are you a Trainer?
           </h2>
           <p className="text-lg font-['Manrope'] text-zinc-600 mb-8">
-            Join HourlyGym to list your gym or offer training sessions
+            Join HourlyGym to offer training sessions
           </p>
           <Button
             onClick={() => navigate('/login')}
@@ -139,7 +127,7 @@ const Landing = () => {
             className="bg-black text-white hover:bg-zinc-800 rounded-md px-8"
             data-testid="partner-login-button"
           >
-            Partner Login
+            Trainer Login
           </Button>
         </div>
       </section>

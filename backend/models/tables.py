@@ -22,6 +22,15 @@ class BookingStatusEnum(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class TrainerOnboardingStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    UNDER_REVIEW = "under_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    REWORK_REQUIRED = "rework_required"
+
+
 def _now():
     return datetime.now(timezone.utc)
 
@@ -92,6 +101,78 @@ class Trainer(Base):
     rejected = Column(Boolean, nullable=False, default=False)
     rating = Column(Float, nullable=False, default=0.0)
     reviews_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+    @property
+    def verification_status(self) -> str:
+        if self.approved:
+            return "approved"
+        if self.rejected:
+            return "rejected"
+        return "under_review"
+
+
+class TrainerOnboarding(Base):
+    __tablename__ = "trainer_onboarding"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    onboarding_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("tonb"))
+    user_id = Column(String(24), ForeignKey("users.user_id"), nullable=False, index=True)
+    trainer_id = Column(String(24), ForeignKey("trainers.trainer_id"), nullable=True, index=True)
+    status = Column(
+        SAEnum(TrainerOnboardingStatusEnum),
+        nullable=False,
+        default=TrainerOnboardingStatusEnum.DRAFT,
+        index=True,
+    )
+    last_step = Column(String(50), nullable=True)
+    basic_profile = Column(JSON, nullable=False, default=dict)
+    kyc = Column(JSON, nullable=False, default=dict)
+    bank = Column(JSON, nullable=False, default=dict)
+    availability = Column(JSON, nullable=False, default=dict)
+    certificates = Column(JSON, nullable=False, default=dict)
+    declaration_accepted = Column(Boolean, nullable=False, default=False)
+    admin_reason = Column(Text, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+
+class TrainerDocument(Base):
+    __tablename__ = "trainer_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("tdoc"))
+    onboarding_id = Column(
+        String(24),
+        ForeignKey("trainer_onboarding.onboarding_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(String(24), ForeignKey("users.user_id"), nullable=False, index=True)
+    document_type = Column(String(50), nullable=False, index=True)
+    document_url = Column(String(500), nullable=False)
+    verification_status = Column(String(20), nullable=False, default="pending")
+    rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class TrainerVerificationEvent(Base):
+    __tablename__ = "trainer_verification_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("tve"))
+    onboarding_id = Column(
+        String(24),
+        ForeignKey("trainer_onboarding.onboarding_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id = Column(String(24), nullable=False, index=True)
+    action = Column(String(50), nullable=False, index=True)
+    note = Column(Text, nullable=True)
+    meta = Column(JSON, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now)
 
 

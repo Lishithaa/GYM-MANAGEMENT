@@ -29,14 +29,19 @@ const ProtectedRoute = ({ children, roles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  const dashboardMap = {
+    user: '/dashboard',
+    gym_owner: '/gym-owner/dashboard',
+    trainer: '/trainer/dashboard',
+    admin: '/admin'
+  };
+
+  // Keep /dashboard as the consumer dashboard only.
+  if (roles.length === 0 && location.pathname === '/dashboard' && user?.role && user.role !== 'user') {
+    return <Navigate to={dashboardMap[user.role] || '/dashboard'} replace />;
+  }
+
   if (roles.length > 0 && !roles.includes(user?.role)) {
-    // Redirect to user's appropriate dashboard
-    const dashboardMap = {
-      user: '/dashboard',
-      gym_owner: '/gym-owner/dashboard',
-      trainer: '/trainer/dashboard',
-      admin: '/admin'
-    };
     return <Navigate to={dashboardMap[user?.role] || '/dashboard'} replace />;
   }
 

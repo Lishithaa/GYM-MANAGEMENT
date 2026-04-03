@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -28,13 +28,7 @@ const GymDetail = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchGymDetails();
-    fetchTrainers();
-    fetchReviews();
-  }, [id]);
-
-  const fetchGymDetails = async () => {
+  const fetchGymDetails = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/gyms/${id}`);
       setGym(response.data);
@@ -44,9 +38,9 @@ const GymDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchTrainers = async () => {
+  const fetchTrainers = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/trainers`, {
         params: { gym_id: id }
@@ -55,16 +49,22 @@ const GymDetail = () => {
     } catch (error) {
       console.error('Error fetching trainers:', error);
     }
-  };
+  }, [id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reviews/gym/${id}`);
       setReviews(response.data);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchGymDetails();
+    fetchTrainers();
+    fetchReviews();
+  }, [fetchGymDetails, fetchTrainers, fetchReviews]);
 
   const handleBooking = async () => {
     if (!user) {

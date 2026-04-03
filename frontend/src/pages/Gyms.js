@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -20,44 +20,25 @@ const Gyms = () => {
   const [selectedArea, setSelectedArea] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchCities();
-    fetchGyms();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCity && selectedCity !== '_all') {
-      setSelectedArea('');
-      fetchAreas(selectedCity);
-    } else {
-      setAreas([]);
-      setSelectedArea('');
-    }
-  }, [selectedCity]);
-
-  useEffect(() => {
-    fetchGyms();
-  }, [selectedCity, selectedArea]);
-
-  const fetchCities = async () => {
+  const fetchCities = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/cities`);
       setCities(response.data.cities);
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
-  };
+  }, []);
 
-  const fetchAreas = async (city) => {
+  const fetchAreas = useCallback(async (city) => {
     try {
       const response = await axios.get(`${API}/areas/${city}`);
       setAreas(response.data.areas);
     } catch (error) {
       console.error('Error fetching areas:', error);
     }
-  };
+  }, []);
 
-  const fetchGyms = async () => {
+  const fetchGyms = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -71,7 +52,25 @@ const Gyms = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCity, selectedArea]);
+
+  useEffect(() => {
+    fetchCities();
+  }, [fetchCities]);
+
+  useEffect(() => {
+    if (selectedCity && selectedCity !== '_all') {
+      setSelectedArea('');
+      fetchAreas(selectedCity);
+    } else {
+      setAreas([]);
+      setSelectedArea('');
+    }
+  }, [selectedCity, fetchAreas]);
+
+  useEffect(() => {
+    fetchGyms();
+  }, [fetchGyms]);
 
   return (
     <div className="min-h-screen bg-white">

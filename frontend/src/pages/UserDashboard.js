@@ -27,8 +27,17 @@ const UserDashboard = () => {
   });
 
   useEffect(() => {
+    if (user?.role && user.role !== 'user') {
+      const dashboardMap = {
+        trainer: '/trainer/dashboard',
+        gym_owner: '/gym-owner/dashboard',
+        admin: '/admin'
+      };
+      navigate(dashboardMap[user.role] || '/dashboard');
+      return;
+    }
     fetchBookings();
-  }, []);
+  }, [user, navigate]);
 
   const fetchBookings = async () => {
     try {
@@ -137,11 +146,11 @@ const UserDashboard = () => {
                   <Calendar className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
                   <p className="text-zinc-600 mb-4">No upcoming bookings</p>
                   <Button
-                    onClick={() => navigate('/gyms')}
+                    onClick={() => navigate('/trainers')}
                     className="bg-blue-600 text-white hover:bg-blue-700 rounded-md"
-                    data-testid="browse-gyms-button"
+                    data-testid="browse-trainers-button"
                   >
-                    Browse Gyms
+                    Browse Trainers
                   </Button>
                 </CardContent>
               </Card>

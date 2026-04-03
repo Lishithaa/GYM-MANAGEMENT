@@ -54,5 +54,6 @@ class TrainerOut(BaseModel):
     lat: Optional[float]
     lng: Optional[float]
     approved: bool
+    verification_status: str
     rating: float
     reviews_count: int

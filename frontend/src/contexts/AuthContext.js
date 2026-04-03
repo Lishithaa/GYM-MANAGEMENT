@@ -10,38 +10,94 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API}/auth/me`, {
-        withCredentials: true
-      });
-      setUser(response.data);
-    } catch (error) {
-      setUser(null);
-    } finally {
-      setLoading(false);
+  const setAxiosAuthHeader = useCallback((token) => {
+    if (token) {
+      axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common.Authorization;
     }
   }, []);
 
-  useEffect(() => {
-    if (window.location.hash?.includes('session_id=')) {
+  const refreshAccessToken = useCallback(async () => {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return null;
+    try {
+      const response = await axios.post(`${API}/auth/refresh`, {
+        refresh_token: refreshToken
+      });
+      const newAccessToken = response.data.access_token;
+      localStorage.setItem('access_token', newAccessToken);
+      setAxiosAuthHeader(newAccessToken);
+      return newAccessToken;
+    } catch (error) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      setAxiosAuthHeader(null);
+      return null;
+    }
+  }, [setAxiosAuthHeader]);
+
+  const checkAuth = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setUser(null);
       setLoading(false);
       return;
     }
+
+    setAxiosAuthHeader(token);
+    try {
+      const response = await axios.get(`${API}/auth/me`);
+      setUser(response.data);
+    } catch (error) {
+      const renewed = await refreshAccessToken();
+      if (!renewed) {
+        setUser(null);
+      } else {
+        try {
+          const response = await axios.get(`${API}/auth/me`);
+          setUser(response.data);
+        } catch (_e) {
+          setUser(null);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshAccessToken, setAxiosAuthHeader]);
+
+  useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
+  const login = async (email, password) => {
+    const response = await axios.post(`${API}/auth/login`, { email, password });
+    const { access_token: accessToken, refresh_token: refreshToken, user: userData } = response.data;
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+    setAxiosAuthHeader(accessToken);
+    setUser(userData);
+    return userData;
+  };
+
   const logout = async () => {
+    const refreshToken = localStorage.getItem('refresh_token');
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-      setUser(null);
+      if (refreshToken) {
+        await axios.post(`${API}/auth/logout`, { refresh_token: refreshToken });
+      }
     } catch (error) {
       console.error('Logout failed:', error);
+    } finally {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      setAxiosAuthHeader(null);
+      setUser(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, setUser, loading, logout, checkAuth, login }}>
       {children}
     </AuthContext.Provider>
   );

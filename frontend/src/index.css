@@ -41,3 +41,10 @@
     font-family: 'Outfit', sans-serif;
   }
 }
+
+/* Hide Emergent badge if re-injected */
+#emergent-badge {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

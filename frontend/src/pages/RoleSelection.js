@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dumbbell, User, Building2, Users } from 'lucide-react';
+import { Dumbbell, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -53,7 +53,7 @@ const RoleSelection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card
             className="border-zinc-200 cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => selectRole('user')}
@@ -66,22 +66,6 @@ const RoleSelection = () => {
               <h3 className="text-xl font-bold font-['Outfit'] mb-2">User</h3>
               <p className="text-sm text-zinc-600 font-['Manrope']">
                 Book gyms and trainers by the hour
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="border-zinc-200 cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => selectRole('gym_owner')}
-            data-testid="role-gym-owner"
-          >
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Building2 className="w-8 h-8 text-green-600" strokeWidth={2} />
-              </div>
-              <h3 className="text-xl font-bold font-['Outfit'] mb-2">Gym Owner</h3>
-              <p className="text-sm text-zinc-600 font-['Manrope']">
-                List your gym and manage bookings
               </p>
             </CardContent>
           </Card>

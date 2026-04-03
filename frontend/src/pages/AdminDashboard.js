@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -18,16 +18,7 @@ const AdminDashboard = () => {
   const [pendingTrainers, setPendingTrainers] = useState([]);
   const [stats, setStats] = useState(null);
 
-  useEffect(() => {
-    if (user?.role !== 'admin') {
-      navigate('/dashboard');
-      return;
-    }
-    fetchPendingApprovals();
-    fetchStats();
-  }, [user]);
-
-  const fetchPendingApprovals = async () => {
+  const fetchPendingApprovals = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/admin/pending-approvals`, {
         withCredentials: true
@@ -37,9 +28,9 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching approvals:', error);
     }
-  };
+  }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/admin/stats`, {
         withCredentials: true
@@ -48,7 +39,16 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') {
+      navigate('/dashboard');
+      return;
+    }
+    fetchPendingApprovals();
+    fetchStats();
+  }, [user, navigate, fetchPendingApprovals, fetchStats]);
 
   const approveItem = async (itemType, itemId) => {
     try {

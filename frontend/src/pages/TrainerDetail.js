@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,7 @@ const TrainerDetail = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchTrainerDetails();
-    fetchReviews();
-  }, [id]);
-
-  const fetchTrainerDetails = async () => {
+  const fetchTrainerDetails = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/trainers/${id}`);
       setTrainer(response.data);
@@ -42,16 +37,21 @@ const TrainerDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/reviews/trainer/${id}`);
       setReviews(response.data);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchTrainerDetails();
+    fetchReviews();
+  }, [fetchTrainerDetails, fetchReviews]);
 
   const handleBooking = async () => {
     if (!user) {

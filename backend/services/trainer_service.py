@@ -42,6 +42,7 @@ async def create_trainer_profile(db: AsyncSession, user_id: str, data: TrainerIn
         lat=data.lat,
         lng=data.lng,
         approved=False,
+        rejected=False,
     )
     db.add(trainer)
     await db.flush()
@@ -56,6 +57,16 @@ async def create_trainer_profile(db: AsyncSession, user_id: str, data: TrainerIn
 
 async def get_trainer_by_id(db: AsyncSession, trainer_id: str) -> Trainer:
     result = await db.execute(select(Trainer).where(Trainer.trainer_id == trainer_id))
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(404, "Trainer not found")
+    return t
+
+
+async def get_public_trainer_by_id(db: AsyncSession, trainer_id: str) -> Trainer:
+    result = await db.execute(
+        select(Trainer).where(Trainer.trainer_id == trainer_id, Trainer.approved == True)
+    )
     t = result.scalar_one_or_none()
     if not t:
         raise HTTPException(404, "Trainer not found")

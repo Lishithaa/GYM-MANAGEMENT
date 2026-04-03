@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -32,32 +32,16 @@ const TrainerDashboard = () => {
     hourly_rate: ''
   });
 
-  useEffect(() => {
-    if (user?.role !== 'trainer') {
-      navigate('/dashboard');
-      return;
-    }
-    fetchMyProfile();
-    fetchGyms();
-  }, [user]);
-
-  useEffect(() => {
-    if (myProfile) {
-      fetchBookings();
-      calculateEarnings();
-    }
-  }, [myProfile]);
-
-  const fetchGyms = async () => {
+  const fetchGyms = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/gyms`);
       setGyms(response.data);
     } catch (error) {
       console.error('Error fetching gyms:', error);
     }
-  };
+  }, []);
 
-  const fetchMyProfile = async () => {
+  const fetchMyProfile = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/trainer/my-profile`, {
         withCredentials: true
@@ -68,9 +52,9 @@ const TrainerDashboard = () => {
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
-  };
+  }, []);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/trainer/bookings`, {
         withCredentials: true
@@ -79,9 +63,9 @@ const TrainerDashboard = () => {
     } catch (error) {
       console.error('Error fetching bookings:', error);
     }
-  };
+  }, []);
 
-  const calculateEarnings = () => {
+  const calculateEarnings = useCallback(() => {
     const total = bookings
       .filter(b => b.status === 'confirmed')
       .reduce((sum, b) => sum + b.amount, 0);
@@ -95,7 +79,26 @@ const TrainerDashboard = () => {
       .reduce((sum, b) => sum + b.amount, 0);
 
     setEarnings({ total, monthly });
-  };
+  }, [bookings]);
+
+  useEffect(() => {
+    if (user?.role !== 'trainer') {
+      navigate('/dashboard');
+      return;
+    }
+    fetchMyProfile();
+    fetchGyms();
+  }, [user, navigate, fetchMyProfile, fetchGyms]);
+
+  useEffect(() => {
+    if (myProfile) {
+      fetchBookings();
+    }
+  }, [myProfile, fetchBookings]);
+
+  useEffect(() => {
+    calculateEarnings();
+  }, [calculateEarnings]);
 
   const handleCreateProfile = async (e) => {
     e.preventDefault();

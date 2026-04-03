@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -36,31 +36,14 @@ const GymOwnerDashboard = () => {
     hourly_rate: ''
   });
 
-  useEffect(() => {
-    if (user?.role !== 'gym_owner') {
-      navigate('/dashboard');
-      return;
-    }
-    fetchMyGym();
-    fetchCities();
-  }, [user]);
-
-  useEffect(() => {
-    if (myGym) {
-      fetchBookings();
-      fetchTrainers();
-      calculateEarnings();
-    }
-  }, [myGym]);
-
-  const fetchCities = async () => {
+  const fetchCities = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/cities`);
       setCities(response.data.cities);
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
-  };
+  }, []);
 
   const fetchAreas = async (city) => {
     try {
@@ -71,7 +54,7 @@ const GymOwnerDashboard = () => {
     }
   };
 
-  const fetchMyGym = async () => {
+  const fetchMyGym = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/gym-owner/my-gym`, {
         withCredentials: true
@@ -82,9 +65,9 @@ const GymOwnerDashboard = () => {
     } catch (error) {
       console.error('Error fetching gym:', error);
     }
-  };
+  }, []);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/gym-owner/bookings`, {
         withCredentials: true
@@ -93,9 +76,9 @@ const GymOwnerDashboard = () => {
     } catch (error) {
       console.error('Error fetching bookings:', error);
     }
-  };
+  }, []);
 
-  const fetchTrainers = async () => {
+  const fetchTrainers = useCallback(async () => {
     if (!myGym) return;
     try {
       const response = await axios.get(`${API}/trainers?gym_id=${myGym.gym_id}`);
@@ -103,9 +86,9 @@ const GymOwnerDashboard = () => {
     } catch (error) {
       console.error('Error fetching trainers:', error);
     }
-  };
+  }, [myGym]);
 
-  const calculateEarnings = () => {
+  const calculateEarnings = useCallback(() => {
     const total = bookings
       .filter(b => b.status === 'confirmed')
       .reduce((sum, b) => sum + b.amount, 0);
@@ -119,7 +102,27 @@ const GymOwnerDashboard = () => {
       .reduce((sum, b) => sum + b.amount, 0);
 
     setEarnings({ total, monthly });
-  };
+  }, [bookings]);
+
+  useEffect(() => {
+    if (user?.role !== 'gym_owner') {
+      navigate('/dashboard');
+      return;
+    }
+    fetchMyGym();
+    fetchCities();
+  }, [user, navigate, fetchMyGym, fetchCities]);
+
+  useEffect(() => {
+    if (myGym) {
+      fetchBookings();
+      fetchTrainers();
+    }
+  }, [myGym, fetchBookings, fetchTrainers]);
+
+  useEffect(() => {
+    calculateEarnings();
+  }, [calculateEarnings]);
 
   const handleCreateGym = async (e) => {
     e.preventDefault();

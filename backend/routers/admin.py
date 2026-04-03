@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +7,8 @@ from database import get_db
 from dependencies import require_roles
 from models.tables import AuditLog, Booking, BookingStatusEnum, Trainer, User
 from schemas.trainer import TrainerOut
-from services import trainer_service
+from schemas.trainer_onboarding import AdminDecisionIn, TrainerOnboardingOut
+from services import trainer_onboarding_service, trainer_service, audit_service
 from routers.misc import CITIES_AREAS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -51,16 +52,112 @@ async def pending_trainers(db: AsyncSession = Depends(get_db), _: User = Depends
     return [TrainerOut.model_validate(t) for t in result.scalars().all()]
 
 
+@router.get("/trainers/onboarding/pending", response_model=List[TrainerOnboardingOut])
+async def pending_onboarding_reviews(db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
+    onboardings = await trainer_onboarding_service.list_pending_onboardings(db)
+    return [
+        TrainerOnboardingOut.model_validate(trainer_onboarding_service.mask_onboarding_sensitive(o))
+        for o in onboardings
+    ]
+
+
+@router.post("/trainers/onboarding/{onboarding_id}/approve", response_model=TrainerOnboardingOut)
+async def approve_onboarding(
+    onboarding_id: str,
+    body: AdminDecisionIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(_admin),
+):
+    o = await trainer_onboarding_service.admin_decide(
+        db, onboarding_id, admin.user_id, action="approve", reason=body.reason
+    )
+    await audit_service.record(
+        db,
+        "trainer.onboarding.approved",
+        admin.user_id,
+        "trainer_onboarding",
+        onboarding_id,
+        meta={"reason": body.reason},
+    )
+    return TrainerOnboardingOut.model_validate(trainer_onboarding_service.mask_onboarding_sensitive(o))
+
+
+@router.post("/trainers/onboarding/{onboarding_id}/reject", response_model=TrainerOnboardingOut)
+async def reject_onboarding(
+    onboarding_id: str,
+    body: AdminDecisionIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(_admin),
+):
+    o = await trainer_onboarding_service.admin_decide(
+        db, onboarding_id, admin.user_id, action="reject", reason=body.reason
+    )
+    await audit_service.record(
+        db,
+        "trainer.onboarding.rejected",
+        admin.user_id,
+        "trainer_onboarding",
+        onboarding_id,
+        meta={"reason": body.reason},
+    )
+    return TrainerOnboardingOut.model_validate(trainer_onboarding_service.mask_onboarding_sensitive(o))
+
+
+@router.post("/trainers/onboarding/{onboarding_id}/rework", response_model=TrainerOnboardingOut)
+async def request_rework_onboarding(
+    onboarding_id: str,
+    body: AdminDecisionIn,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(_admin),
+):
+    o = await trainer_onboarding_service.admin_decide(
+        db, onboarding_id, admin.user_id, action="rework", reason=body.reason
+    )
+    await audit_service.record(
+        db,
+        "trainer.onboarding.rework_required",
+        admin.user_id,
+        "trainer_onboarding",
+        onboarding_id,
+        meta={"reason": body.reason},
+    )
+    return TrainerOnboardingOut.model_validate(trainer_onboarding_service.mask_onboarding_sensitive(o))
+
+
 @router.post("/trainers/{trainer_id}/approve")
-async def approve_trainer(trainer_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
-    t = await trainer_service.approve_trainer(db, trainer_id)
-    return {"message": "Trainer approved", "trainer_id": t.trainer_id}
+async def approve_trainer(
+    trainer_id: str,
+    body: Optional[AdminDecisionIn] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(_admin),
+):
+    onboarding = await trainer_onboarding_service.get_latest_onboarding_for_trainer(db, trainer_id)
+    await trainer_onboarding_service.admin_decide(
+        db,
+        onboarding.onboarding_id,
+        admin.user_id,
+        action="approve",
+        reason=(body.reason if body else "Approved by admin"),
+    )
+    return {"message": "Trainer approved", "trainer_id": trainer_id}
 
 
 @router.post("/trainers/{trainer_id}/reject")
-async def reject_trainer(trainer_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
-    t = await trainer_service.reject_trainer(db, trainer_id)
-    return {"message": "Trainer rejected", "trainer_id": t.trainer_id}
+async def reject_trainer(
+    trainer_id: str,
+    body: Optional[AdminDecisionIn] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(_admin),
+):
+    onboarding = await trainer_onboarding_service.get_latest_onboarding_for_trainer(db, trainer_id)
+    await trainer_onboarding_service.admin_decide(
+        db,
+        onboarding.onboarding_id,
+        admin.user_id,
+        action="reject",
+        reason=(body.reason if body else "Rejected by admin"),
+    )
+    return {"message": "Trainer rejected", "trainer_id": trainer_id}
 
 
 @router.get("/stats")
