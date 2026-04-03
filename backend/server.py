@@ -1,3 +1,7 @@
+"""
+Legacy HourlyGym API: MongoDB + cookie sessions.
+For the current app (MySQL + JWT), run: python -m uvicorn main:app --reload --port 8000
+"""
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Header
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
