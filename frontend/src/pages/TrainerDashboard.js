@@ -14,49 +14,111 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
 
+const WHAT_YOU_TEACH_OPTIONS = [
+  'Fat Loss',
+  'Muscle & Strength Gaining',
+  'Yoga',
+  'Physiotherapy',
+  'Running Coaching',
+  'Calisthenics',
+  'Dance Fitness',
+  'Pregnancy Training',
+  'Boxing Training',
+  'Senior Citizen Mobility',
+  'Fitness for Children',
+  'Home Workouts'
+];
+
+const DAY_OPTIONS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const parseCsv = (value) =>
+  value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
 const TrainerDashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [myProfile, setMyProfile] = useState(null);
   const [bookings, setBookings] = useState([]);
-  const [gyms, setGyms] = useState([]);
   const [earnings, setEarnings] = useState({ total: 0, monthly: 0 });
-  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showOnboardingForm, setShowOnboardingForm] = useState(false);
+  const [onboardingId, setOnboardingId] = useState(null);
+  const [onboardingPage, setOnboardingPage] = useState(1);
+  const [cities, setCities] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const [profileForm, setProfileForm] = useState({
-    gym_id: '',
+    city: '',
+    area: '',
+    gender: '',
+    whatYouTeach: [],
     bio: '',
+    experience_brief: '',
     photo: '',
-    specialty: '',
-    hourly_rate: ''
+    hourly_rate: '',
+    service_areas_csv: '',
+    travel_radius: '10',
+    available_days: DAY_OPTIONS,
+    availability_slots_csv: '06:00-07:00, 07:00-08:00',
+    video_verification_url: '',
+    aadhar_number: '',
+    digilocker_kyc: false,
+    pan_number: '',
+    pan_upload_url: '',
+    bank_account_name: '',
+    bank_account_number: '',
+    bank_ifsc: '',
+    certifications: '',
+    certification_upload_urls_csv: '',
+    video_intro: '',
+    declaration_accepted: false
   });
-
-  const fetchGyms = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API}/gyms`);
-      setGyms(response.data);
-    } catch (error) {
-      console.error('Error fetching gyms:', error);
-    }
-  }, []);
 
   const fetchMyProfile = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/trainer/my-profile`, {
-        withCredentials: true
-      });
+      const response = await axios.get(`${API}/trainers/me`);
       if (response.data) {
         setMyProfile(response.data);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      if (error?.response?.status !== 404) {
+        console.error('Error fetching profile:', error);
+      }
+      setMyProfile(null);
     }
+  }, []);
+
+  const fetchCities = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/cities`);
+      setCities(response.data || []);
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+    }
+  }, []);
+
+  const fetchAreas = useCallback(async (city) => {
+    if (!city) return;
+    try {
+      const response = await axios.get(`${API}/areas/${city}`);
+      setAreas(response.data || []);
+    } catch (error) {
+      console.error('Error fetching areas:', error);
+      setAreas([]);
+    }
+  }, []);
+
+  const startOnboarding = useCallback(async () => {
+    const response = await axios.post(`${API}/trainers/onboarding/start`);
+    setOnboardingId(response.data.onboarding_id);
+    return response.data.onboarding_id;
   }, []);
 
   const fetchBookings = useCallback(async () => {
     try {
-      const response = await axios.get(`${API}/trainer/bookings`, {
-        withCredentials: true
-      });
+      const response = await axios.get(`${API}/trainer/bookings`);
       setBookings(response.data);
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -85,8 +147,8 @@ const TrainerDashboard = () => {
       return;
     }
     fetchMyProfile();
-    fetchGyms();
-  }, [user, navigate, fetchMyProfile, fetchGyms]);
+    fetchCities();
+  }, [user, navigate, fetchMyProfile]);
 
   useEffect(() => {
     if (myProfile) {
@@ -98,24 +160,96 @@ const TrainerDashboard = () => {
     calculateEarnings();
   }, [calculateEarnings]);
 
-  const handleCreateProfile = async (e) => {
+  const handleOnboardingNext = async (e) => {
     e.preventDefault();
-    try {
-      await axios.post(
-        `${API}/trainers`,
-        {
-          ...profileForm,
-          hourly_rate: parseFloat(profileForm.hourly_rate)
-        },
-        { withCredentials: true }
-      );
+    if (!profileForm.city || !profileForm.area || profileForm.whatYouTeach.length === 0) {
+      toast.error('Please fill city, area and what you teach');
+      return;
+    }
 
-      toast.success('Profile created! Waiting for admin approval.');
-      setShowProfileForm(false);
+    setSubmitting(true);
+    try {
+      const id = onboardingId || (await startOnboarding());
+      await axios.patch(`${API}/trainers/onboarding/${id}/step`, {
+        step: 'basic_profile',
+        basic_profile: {
+          bio: profileForm.bio,
+          specialty: profileForm.whatYouTeach.join(', '),
+          experience_brief: profileForm.experience_brief || profileForm.bio,
+          photo: profileForm.photo,
+          city: profileForm.city,
+          area: profileForm.area,
+          hourly_rate: parseFloat(profileForm.hourly_rate || '0'),
+          gender: profileForm.gender || 'unspecified',
+          languages: ['English', 'Hindi']
+        }
+      });
+      await axios.patch(`${API}/trainers/onboarding/${id}/step`, {
+        step: 'availability',
+        availability: {
+          available_days: profileForm.available_days,
+          availability_slots: parseCsv(profileForm.availability_slots_csv),
+          travel_radius: parseInt(profileForm.travel_radius || '10', 10),
+          service_areas: parseCsv(profileForm.service_areas_csv)
+        }
+      });
+      setOnboardingPage(2);
+      toast.success('Step 1 saved');
+    } catch (error) {
+      console.error('Onboarding step 1 error:', error);
+      toast.error(error?.response?.data?.detail || 'Failed to save step 1');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOnboardingSubmit = async (e) => {
+    e.preventDefault();
+    if (!profileForm.declaration_accepted) {
+      toast.error('Please accept declaration before submitting');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const id = onboardingId || (await startOnboarding());
+      await axios.patch(`${API}/trainers/onboarding/${id}/step`, {
+        step: 'kyc',
+        kyc: {
+          aadhar_number: profileForm.aadhar_number,
+          digilocker_kyc: profileForm.digilocker_kyc,
+          pan_number: profileForm.pan_number,
+          pan_upload_url: profileForm.pan_upload_url,
+          video_verification_url: profileForm.video_verification_url
+        }
+      });
+      await axios.patch(`${API}/trainers/onboarding/${id}/step`, {
+        step: 'bank',
+        bank: {
+          bank_account_name: profileForm.bank_account_name,
+          bank_account_number: profileForm.bank_account_number,
+          bank_ifsc: profileForm.bank_ifsc
+        }
+      });
+      await axios.patch(`${API}/trainers/onboarding/${id}/step`, {
+        step: 'certificates',
+        certificates: {
+          certifications: profileForm.certifications,
+          certification_upload_urls: parseCsv(profileForm.certification_upload_urls_csv),
+          video_intro: profileForm.video_intro,
+          photo_branding_enabled: true,
+          declaration_accepted: profileForm.declaration_accepted
+        }
+      });
+      await axios.post(`${API}/trainers/onboarding/${id}/submit`);
+      toast.success('Onboarding submitted successfully. Awaiting admin approval.');
+      setShowOnboardingForm(false);
+      setOnboardingPage(1);
       fetchMyProfile();
     } catch (error) {
-      console.error('Error creating profile:', error);
-      toast.error('Failed to create profile');
+      console.error('Onboarding submit error:', error);
+      toast.error(error?.response?.data?.detail || 'Failed to submit onboarding');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -150,13 +284,13 @@ const TrainerDashboard = () => {
             <CardContent className="p-12 text-center">
               <Users className="w-16 h-16 mx-auto mb-4 text-zinc-400" />
               <h3 className="text-xl font-bold mb-2">No Trainer Profile</h3>
-              <p className="text-zinc-600 mb-6">Create your trainer profile to start offering sessions</p>
+              <p className="text-zinc-600 mb-6">Complete onboarding to start offering sessions</p>
               <Button
-                onClick={() => setShowProfileForm(true)}
+                onClick={() => setShowOnboardingForm(true)}
                 className="bg-black text-white hover:bg-zinc-800 rounded-md"
                 data-testid="create-profile-button"
               >
-                Create Trainer Profile
+                Start Trainer Onboarding
               </Button>
             </CardContent>
           </Card>
@@ -282,72 +416,331 @@ const TrainerDashboard = () => {
         )}
       </div>
 
-      <Dialog open={showProfileForm} onOpenChange={setShowProfileForm}>
+      <Dialog open={showOnboardingForm} onOpenChange={setShowOnboardingForm}>
         <DialogContent className="max-w-2xl" aria-describedby="profile-form-description">
           <DialogHeader>
-            <DialogTitle>Create Trainer Profile</DialogTitle>
+            <DialogTitle>Trainer Onboarding (Step {onboardingPage} of 2)</DialogTitle>
           </DialogHeader>
-          <p id="profile-form-description" className="sr-only">Fill in your trainer profile details</p>
-          <form onSubmit={handleCreateProfile} className="space-y-4">
-            <div>
-              <Label>Select Gym</Label>
-              <Select
-                value={profileForm.gym_id}
-                onValueChange={(val) => setProfileForm({ ...profileForm, gym_id: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select gym" />
-                </SelectTrigger>
-                <SelectContent>
-                  {gyms.map((gym) => (
-                    <SelectItem key={gym.gym_id} value={gym.gym_id}>
-                      {gym.name} - {gym.city}
-                    </SelectItem>
+          <p id="profile-form-description" className="sr-only">Fill in your trainer onboarding details</p>
+
+          {onboardingPage === 1 ? (
+            <form onSubmit={handleOnboardingNext} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>City</Label>
+                  <Select
+                    value={profileForm.city}
+                    onValueChange={(val) => {
+                      setProfileForm({ ...profileForm, city: val, area: '' });
+                      fetchAreas(val);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Area</Label>
+                  <Select
+                    value={profileForm.area}
+                    onValueChange={(val) => setProfileForm({ ...profileForm, area: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select area" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {areas.map((area) => (
+                        <SelectItem key={area} value={area}>
+                          {area}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label>What do you teach? (select multiple)</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {WHAT_YOU_TEACH_OPTIONS.map((opt) => (
+                    <label key={opt} className="text-sm flex items-center gap-2 border rounded px-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={profileForm.whatYouTeach.includes(opt)}
+                        onChange={(e) =>
+                          setProfileForm({
+                            ...profileForm,
+                            whatYouTeach: e.target.checked
+                              ? [...profileForm.whatYouTeach, opt]
+                              : profileForm.whatYouTeach.filter((v) => v !== opt)
+                          })
+                        }
+                      />
+                      {opt}
+                    </label>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Specialty</Label>
-              <Input
-                value={profileForm.specialty}
-                onChange={(e) => setProfileForm({ ...profileForm, specialty: e.target.value })}
-                placeholder="e.g., Strength Training, Yoga, CrossFit"
-                required
-              />
-            </div>
-            <div>
-              <Label>Bio</Label>
-              <Textarea
-                value={profileForm.bio}
-                onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
-                rows={3}
-                placeholder="Tell clients about your experience and expertise"
-                required
-              />
-            </div>
-            <div>
-              <Label>Photo URL</Label>
-              <Input
-                value={profileForm.photo}
-                onChange={(e) => setProfileForm({ ...profileForm, photo: e.target.value })}
-                placeholder="https://example.com/your-photo.jpg"
-                required
-              />
-            </div>
-            <div>
-              <Label>Hourly Rate (₹)</Label>
-              <Input
-                type="number"
-                value={profileForm.hourly_rate}
-                onChange={(e) => setProfileForm({ ...profileForm, hourly_rate: e.target.value })}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full bg-black text-white hover:bg-zinc-800 rounded-md">
-              Create Profile
-            </Button>
-          </form>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Gender</Label>
+                  <Select
+                    value={profileForm.gender}
+                    onValueChange={(val) => setProfileForm({ ...profileForm, gender: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Hourly Rate (₹)</Label>
+                  <Input
+                    type="number"
+                    value={profileForm.hourly_rate}
+                    onChange={(e) => setProfileForm({ ...profileForm, hourly_rate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Brief Bio</Label>
+                <Textarea
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                  rows={2}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label>Experience Brief</Label>
+                <Textarea
+                  value={profileForm.experience_brief}
+                  onChange={(e) => setProfileForm({ ...profileForm, experience_brief: e.target.value })}
+                  rows={2}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label>Photo Upload URL</Label>
+                <Input
+                  value={profileForm.photo}
+                  onChange={(e) => setProfileForm({ ...profileForm, photo: e.target.value })}
+                  placeholder="https://..."
+                  required
+                />
+                <p className="text-xs text-zinc-500 mt-1">HourlyGym logo branding will be applied after upload.</p>
+              </div>
+
+              <div>
+                <Label>Service areas (comma separated)</Label>
+                <Input
+                  value={profileForm.service_areas_csv}
+                  onChange={(e) => setProfileForm({ ...profileForm, service_areas_csv: e.target.value })}
+                  placeholder="Banjara Hills, Jubilee Hills"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Travel Radius (km)</Label>
+                  <Input
+                    type="number"
+                    value={profileForm.travel_radius}
+                    onChange={(e) => setProfileForm({ ...profileForm, travel_radius: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Availability slots</Label>
+                  <Input
+                    value={profileForm.availability_slots_csv}
+                    onChange={(e) => setProfileForm({ ...profileForm, availability_slots_csv: e.target.value })}
+                    placeholder="06:00-07:00, 18:00-19:00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Available Days</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {DAY_OPTIONS.map((d) => (
+                    <label key={d} className="text-sm flex items-center gap-1 border rounded px-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={profileForm.available_days.includes(d)}
+                        onChange={(e) =>
+                          setProfileForm({
+                            ...profileForm,
+                            available_days: e.target.checked
+                              ? [...profileForm.available_days, d]
+                              : profileForm.available_days.filter((v) => v !== d)
+                          })
+                        }
+                      />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-black text-white hover:bg-zinc-800 rounded-md"
+                disabled={submitting}
+              >
+                {submitting ? 'Saving...' : 'Continue to KYC & Settlement'}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleOnboardingSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Aadhaar Number</Label>
+                  <Input
+                    value={profileForm.aadhar_number}
+                    onChange={(e) => setProfileForm({ ...profileForm, aadhar_number: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>PAN Number</Label>
+                  <Input
+                    value={profileForm.pan_number}
+                    onChange={(e) => setProfileForm({ ...profileForm, pan_number: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>PAN Upload URL</Label>
+                <Input
+                  value={profileForm.pan_upload_url}
+                  onChange={(e) => setProfileForm({ ...profileForm, pan_upload_url: e.target.value })}
+                  placeholder="https://..."
+                  required
+                />
+              </div>
+
+              <div>
+                <Label>Video Verification URL</Label>
+                <Input
+                  value={profileForm.video_verification_url}
+                  onChange={(e) => setProfileForm({ ...profileForm, video_verification_url: e.target.value })}
+                  placeholder="https://..."
+                  required
+                />
+              </div>
+
+              <label className="text-sm flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={profileForm.digilocker_kyc}
+                  onChange={(e) => setProfileForm({ ...profileForm, digilocker_kyc: e.target.checked })}
+                />
+                DigiLocker KYC completed
+              </label>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Bank Account Name</Label>
+                  <Input
+                    value={profileForm.bank_account_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, bank_account_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Bank Account Number</Label>
+                  <Input
+                    value={profileForm.bank_account_number}
+                    onChange={(e) => setProfileForm({ ...profileForm, bank_account_number: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>IFSC</Label>
+                  <Input
+                    value={profileForm.bank_ifsc}
+                    onChange={(e) => setProfileForm({ ...profileForm, bank_ifsc: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Certifications</Label>
+                <Input
+                  value={profileForm.certifications}
+                  onChange={(e) => setProfileForm({ ...profileForm, certifications: e.target.value })}
+                  placeholder="ACE, NASM, CSCS"
+                />
+              </div>
+
+              <div>
+                <Label>Certification Upload URLs (comma separated)</Label>
+                <Input
+                  value={profileForm.certification_upload_urls_csv}
+                  onChange={(e) => setProfileForm({ ...profileForm, certification_upload_urls_csv: e.target.value })}
+                  placeholder="https://..., https://..."
+                />
+              </div>
+
+              <div>
+                <Label>Intro Video URL (optional)</Label>
+                <Input
+                  value={profileForm.video_intro}
+                  onChange={(e) => setProfileForm({ ...profileForm, video_intro: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+
+              <label className="text-sm flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={profileForm.declaration_accepted}
+                  onChange={(e) => setProfileForm({ ...profileForm, declaration_accepted: e.target.checked })}
+                />
+                I confirm all provided details are valid.
+              </label>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-1/2 rounded-md"
+                  onClick={() => setOnboardingPage(1)}
+                  disabled={submitting}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  className="w-1/2 bg-black text-white hover:bg-zinc-800 rounded-md"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Onboarding'}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

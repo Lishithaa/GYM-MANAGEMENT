@@ -20,8 +20,8 @@ async def register_user(
 ) -> tuple[User, str]:
     if len(password) < 8:
         raise HTTPException(422, "Password must be at least 8 characters")
-    if role not in ("user", "trainer", "admin"):
-        raise HTTPException(422, "role must be user, trainer, or admin")
+    if role not in ("user", "trainer"):
+        raise HTTPException(403, "Only user and trainer can self-register; admin is provisioned by the system")
 
     existing = await db.execute(select(User).where(User.email == email.lower()))
     if existing.scalar_one_or_none():

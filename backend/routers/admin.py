@@ -1,11 +1,23 @@
+from datetime import datetime, timezone
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from dependencies import require_roles
-from models.tables import AuditLog, Booking, BookingStatusEnum, Trainer, User
+from models.tables import (
+    AuditLog,
+    Booking,
+    BookingStatusEnum,
+    PromoCode,
+    Trainer,
+    TrainerOnboarding,
+    TrainerOnboardingStatusEnum,
+    User,
+)
+from schemas.common import PromoCodeIn, PromoCodeOut, PromoCodePatch
 from schemas.trainer import TrainerOut
 from schemas.trainer_onboarding import AdminDecisionIn, TrainerOnboardingOut
 from services import trainer_onboarding_service, trainer_service, audit_service
@@ -14,6 +26,180 @@ from routers.misc import CITIES_AREAS
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 _admin = require_roles("admin")
+
+
+def _utc_day_start() -> datetime:
+    now = datetime.now(timezone.utc)
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+@router.get("/dashboard")
+async def admin_dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
+    start = _utc_day_start()
+    sessions_completed_today = (
+        await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.status == BookingStatusEnum.COMPLETED,
+                Booking.completed_at.isnot(None),
+                Booking.completed_at >= start,
+            )
+        )
+    ).scalar() or 0
+
+    pending_onboarding = (
+        await db.execute(
+            select(func.count(TrainerOnboarding.id)).where(
+                TrainerOnboarding.status == TrainerOnboardingStatusEnum.UNDER_REVIEW
+            )
+        )
+    ).scalar() or 0
+
+    approved_trainers = (
+        await db.execute(select(func.count(Trainer.id)).where(Trainer.approved == True))
+    ).scalar() or 0
+
+    trainers_created_today = (
+        await db.execute(
+            select(func.count(Trainer.id)).where(Trainer.created_at >= start)
+        )
+    ).scalar() or 0
+
+    onboarding_approved_today = (
+        await db.execute(
+            select(func.count(TrainerOnboarding.id)).where(
+                TrainerOnboarding.status == TrainerOnboardingStatusEnum.APPROVED,
+                TrainerOnboarding.reviewed_at.isnot(None),
+                TrainerOnboarding.reviewed_at >= start,
+            )
+        )
+    ).scalar() or 0
+
+    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    total_bookings = (await db.execute(select(func.count(Booking.id)))).scalar() or 0
+    completed_all = (
+        await db.execute(
+            select(func.count(Booking.id)).where(Booking.status == BookingStatusEnum.COMPLETED)
+        )
+    ).scalar() or 0
+
+    return {
+        "sessions_completed_today": sessions_completed_today,
+        "pending_onboarding_reviews": pending_onboarding,
+        "active_approved_trainers": approved_trainers,
+        "trainers_profile_created_today": trainers_created_today,
+        "onboarding_approved_today": onboarding_approved_today,
+        "total_users": total_users,
+        "total_bookings": total_bookings,
+        "bookings_completed_all_time": completed_all,
+    }
+
+
+@router.get("/stats/by-city")
+async def stats_by_city(db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
+    start = _utc_day_start()
+    db_cities = (await db.execute(select(Trainer.city).distinct())).scalars().all()
+    cities = sorted(set(CITIES_AREAS.keys()) | {c for c in db_cities if c})
+    rows = []
+    for city in cities:
+        total_trainers = (
+            await db.execute(select(func.count(Trainer.id)).where(Trainer.city == city))
+        ).scalar() or 0
+        approved_trainers = (
+            await db.execute(
+                select(func.count(Trainer.id)).where(Trainer.city == city, Trainer.approved == True)
+            )
+        ).scalar() or 0
+        tid_sub = select(Trainer.trainer_id).where(Trainer.city == city)
+        bookings = (
+            await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.target_type == "trainer",
+                    Booking.target_id.in_(tid_sub),
+                )
+            )
+        ).scalar() or 0
+        sessions_today = (
+            await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.status == BookingStatusEnum.COMPLETED,
+                    Booking.completed_at.isnot(None),
+                    Booking.completed_at >= start,
+                    Booking.target_type == "trainer",
+                    Booking.target_id.in_(tid_sub),
+                )
+            )
+        ).scalar() or 0
+        rows.append(
+            {
+                "city": city,
+                "total_trainers": total_trainers,
+                "approved_trainers": approved_trainers,
+                "bookings": bookings,
+                "sessions_completed_today": sessions_today,
+            }
+        )
+    return rows
+
+
+@router.get("/promos", response_model=List[PromoCodeOut])
+async def list_promos(db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
+    result = await db.execute(select(PromoCode).order_by(PromoCode.created_at.desc()))
+    return [PromoCodeOut.model_validate(p) for p in result.scalars().all()]
+
+
+@router.post("/promos", response_model=PromoCodeOut)
+async def create_promo(
+    body: PromoCodeIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_admin),
+):
+    code = body.code.strip().upper()
+    existing = await db.execute(select(PromoCode).where(PromoCode.code == code))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "Promo code already exists")
+    row = PromoCode(
+        code=code,
+        discount_percent=body.discount_percent,
+        max_uses=body.max_uses,
+        uses=0,
+        valid_until=body.valid_until.strip(),
+    )
+    db.add(row)
+    await db.flush()
+    return PromoCodeOut.model_validate(row)
+
+
+@router.patch("/promos/{code}", response_model=PromoCodeOut)
+async def update_promo(
+    code: str,
+    body: PromoCodePatch,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(_admin),
+):
+    key = code.strip().upper()
+    result = await db.execute(select(PromoCode).where(PromoCode.code == key))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Promo not found")
+    if body.discount_percent is not None:
+        row.discount_percent = body.discount_percent
+    if body.max_uses is not None:
+        row.max_uses = body.max_uses
+    if body.valid_until is not None:
+        row.valid_until = body.valid_until.strip()
+    await db.flush()
+    return PromoCodeOut.model_validate(row)
+
+
+@router.delete("/promos/{code}")
+async def delete_promo(code: str, db: AsyncSession = Depends(get_db), _: User = Depends(_admin)):
+    key = code.strip().upper()
+    result = await db.execute(select(PromoCode).where(PromoCode.code == key))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Promo not found")
+    await db.delete(row)
+    return {"message": "Deleted", "code": key}
 
 
 @router.get("/pending-approvals")
@@ -174,12 +360,23 @@ async def platform_stats(db: AsyncSession = Depends(get_db), _: User = Depends(_
 
     city_stats = []
     for city in CITIES_AREAS.keys():
-        gyms = (
+        approved_in_city = (
             await db.execute(
                 select(func.count(Trainer.id)).where(Trainer.city == city, Trainer.approved == True)
             )
-        ).scalar()
-        city_stats.append({"city": city, "gyms": gyms or 0, "bookings": total_bookings or 0})
+        ).scalar() or 0
+        tid_sub = select(Trainer.trainer_id).where(Trainer.city == city)
+        bookings_in_city = (
+            await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.target_type == "trainer",
+                    Booking.target_id.in_(tid_sub),
+                )
+            )
+        ).scalar() or 0
+        city_stats.append(
+            {"city": city, "gyms": approved_in_city, "bookings": bookings_in_city, "trainers": approved_in_city}
+        )
 
     return {
         "total_users": total_users,

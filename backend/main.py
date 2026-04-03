@@ -9,8 +9,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from config import settings
-from database import Base, engine
+from database import AsyncSessionLocal, Base, engine
 from routers import auth, trainers, bookings, reviews, admin, misc
+from services.admin_seed_service import ensure_default_admin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,6 +38,14 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Database connection timed out") from None
 
     logger.info("Database ready.")
+    async with AsyncSessionLocal() as session:
+        try:
+            await ensure_default_admin(session)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("Failed to ensure default admin user")
+
     yield
     await engine.dispose()
     logger.info("Database connection closed.")

@@ -10,6 +10,12 @@ class PromoCodeIn(BaseModel):
     valid_until: str
 
 
+class PromoCodePatch(BaseModel):
+    discount_percent: Optional[int] = None
+    max_uses: Optional[int] = None
+    valid_until: Optional[str] = None
+
+
 class PromoCodeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
