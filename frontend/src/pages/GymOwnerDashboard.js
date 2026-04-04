@@ -13,6 +13,7 @@ import { Dumbbell, LogOut, Building2, DollarSign, Calendar } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
+import { TrainerShowcaseCard } from '@/components/TrainerShowcaseCard';
 
 const GymOwnerDashboard = () => {
   const navigate = useNavigate();
@@ -315,24 +316,12 @@ const GymOwnerDashboard = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {trainers.map((trainer) => (
-                      <Card key={trainer.trainer_id} className="border-zinc-200">
-                        <CardContent className="p-6">
-                          <div className="flex gap-4">
-                            <img
-                              src={trainer.photo}
-                              alt={trainer.specialty}
-                              className="w-20 h-20 rounded-full object-cover"
-                            />
-                            <div>
-                              <h4 className="font-bold">{trainer.specialty}</h4>
-                              <p className="text-sm text-zinc-600">₹{trainer.hourly_rate}/hour</p>
-                              <p className="text-sm text-zinc-500">
-                                {trainer.approved ? 'Approved' : 'Pending'}
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <div key={trainer.trainer_id} className="space-y-2">
+                        <TrainerShowcaseCard trainer={trainer} variant="compact" />
+                        <p className="text-xs text-zinc-600 text-center">
+                          {trainer.approved ? 'Approved' : 'Pending approval'}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 )}

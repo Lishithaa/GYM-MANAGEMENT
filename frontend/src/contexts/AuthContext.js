@@ -1,6 +1,14 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { API } from '@/config';
+import {
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  migrateTokensFromLocalStorage,
+  getStoredToken,
+  setStoredToken,
+  clearAuthTokens,
+} from '@/utils/tokenStorage';
 
 const AuthContext = createContext();
 
@@ -17,26 +25,26 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const refreshAccessToken = useCallback(async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = getStoredToken(REFRESH_TOKEN_KEY);
     if (!refreshToken) return null;
     try {
       const response = await axios.post(`${API}/auth/refresh`, {
         refresh_token: refreshToken
       });
       const newAccessToken = response.data.access_token;
-      localStorage.setItem('access_token', newAccessToken);
+      setStoredToken(ACCESS_TOKEN_KEY, newAccessToken);
       setAxiosAuthHeader(newAccessToken);
       return newAccessToken;
     } catch (error) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      clearAuthTokens();
       setAxiosAuthHeader(null);
       return null;
     }
   }, [setAxiosAuthHeader]);
 
   const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
+    migrateTokensFromLocalStorage();
+    const token = getStoredToken(ACCESS_TOKEN_KEY);
     if (!token) {
       setUser(null);
       setLoading(false);
@@ -71,15 +79,15 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password }, { timeout: 20000 });
     const { access_token: accessToken, refresh_token: refreshToken, user: userData } = response.data;
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
+    setStoredToken(ACCESS_TOKEN_KEY, accessToken);
+    setStoredToken(REFRESH_TOKEN_KEY, refreshToken);
     setAxiosAuthHeader(accessToken);
     setUser(userData);
     return userData;
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = getStoredToken(REFRESH_TOKEN_KEY);
     try {
       if (refreshToken) {
         await axios.post(`${API}/auth/logout`, { refresh_token: refreshToken });
@@ -87,8 +95,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      clearAuthTokens();
       setAxiosAuthHeader(null);
       setUser(null);
     }

@@ -5,17 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 const ProtectedRoute = ({ children, roles = [] }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    location.state?.user ? true : null
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
 
   useEffect(() => {
-    if (location.state?.user) return;
-    
     if (!loading) {
       setIsAuthenticated(!!user);
     }
-  }, [user, loading, location.state]);
+  }, [user, loading]);
 
   if (isAuthenticated === null || loading) {
     return (

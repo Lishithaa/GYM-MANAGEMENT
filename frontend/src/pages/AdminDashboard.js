@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -14,12 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Dumbbell, LogOut, Check, X, RotateCcw, Trash2 } from 'lucide-react';
+import { Dumbbell, LogOut, Check, X, RotateCcw, Trash2, Users, Handshake, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
 
 const emptyPromoForm = { code: '', discount_percent: '', max_uses: '', valid_until: '' };
+const emptyNewUserForm = { email: '', password: '', name: '', role: 'user', phone: '' };
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -33,6 +35,12 @@ const AdminDashboard = () => {
   const [promoForm, setPromoForm] = useState(emptyPromoForm);
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [decision, setDecision] = useState({ action: 'approve', onboardingId: null, reason: '' });
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [managedTrainers, setManagedTrainers] = useState([]);
+  const [partnerRequests, setPartnerRequests] = useState([]);
+  const [adminComplaints, setAdminComplaints] = useState([]);
+  const [newUserForm, setNewUserForm] = useState(emptyNewUserForm);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -82,6 +90,42 @@ const AdminDashboard = () => {
     }
   }, []);
 
+  const fetchAdminUsers = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/admin/users`);
+      setAdminUsers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  }, []);
+
+  const fetchManagedTrainers = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/admin/trainers/manage`);
+      setManagedTrainers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching trainers:', error);
+    }
+  }, []);
+
+  const fetchPartnerRequests = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/admin/partner-requests`);
+      setPartnerRequests(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching partner requests:', error);
+    }
+  }, []);
+
+  const fetchAdminComplaints = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/admin/complaints`);
+      setAdminComplaints(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching complaints:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (user?.role !== 'admin') {
       navigate('/dashboard');
@@ -91,13 +135,32 @@ const AdminDashboard = () => {
     fetchReviewQueues();
     fetchCityStats();
     fetchPromos();
-  }, [user, navigate, fetchDashboard, fetchReviewQueues, fetchCityStats, fetchPromos]);
+    fetchAdminUsers();
+    fetchManagedTrainers();
+    fetchPartnerRequests();
+    fetchAdminComplaints();
+  }, [
+    user,
+    navigate,
+    fetchDashboard,
+    fetchReviewQueues,
+    fetchCityStats,
+    fetchPromos,
+    fetchAdminUsers,
+    fetchManagedTrainers,
+    fetchPartnerRequests,
+    fetchAdminComplaints,
+  ]);
 
   const refreshAll = () => {
     fetchDashboard();
     fetchReviewQueues();
     fetchCityStats();
     fetchPromos();
+    fetchAdminUsers();
+    fetchManagedTrainers();
+    fetchPartnerRequests();
+    fetchAdminComplaints();
   };
 
   const approveLegacyTrainer = async (trainerId) => {
@@ -107,6 +170,99 @@ const AdminDashboard = () => {
       refreshAll();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Approve failed');
+    }
+  };
+
+  const banUser = async (userId) => {
+    try {
+      await axios.patch(`${API}/admin/users/${userId}/ban`);
+      toast.success('User banned');
+      refreshAll();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Ban failed');
+    }
+  };
+
+  const unbanUser = async (userId) => {
+    try {
+      await axios.patch(`${API}/admin/users/${userId}/unban`);
+      toast.success('User unbanned');
+      refreshAll();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Unban failed');
+    }
+  };
+
+  const createAdminUser = async (e) => {
+    e.preventDefault();
+    const { email, password, name, role, phone } = newUserForm;
+    if (!email.trim() || !password || !name.trim()) {
+      toast.error('Email, password, and name are required');
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      await axios.post(`${API}/admin/users`, {
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        role,
+        phone: phone.trim() || null,
+      });
+      toast.success('User created');
+      setNewUserForm(emptyNewUserForm);
+      fetchAdminUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Could not create user');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const approveTrainerRow = async (trainerId) => {
+    try {
+      await axios.post(`${API}/admin/trainers/${trainerId}/approve`, { reason: 'Approved' });
+      toast.success('Trainer approved');
+      refreshAll();
+    } catch (err) {
+      try {
+        await axios.post(`${API}/admin/approve/trainer/${trainerId}`, {});
+        toast.success('Trainer approved');
+        refreshAll();
+      } catch (error) {
+        toast.error(error.response?.data?.detail || err.response?.data?.detail || 'Approve failed');
+      }
+    }
+  };
+
+  const rejectTrainerRow = async (trainerId) => {
+    const reason = window.prompt('Reason for rejection (optional):') || 'Rejected by admin';
+    try {
+      await axios.post(`${API}/admin/trainers/${trainerId}/reject`, { reason });
+      toast.success('Trainer rejected');
+      refreshAll();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Reject failed — try banning the account instead');
+    }
+  };
+
+  const updatePartnerStatus = async (requestId, status) => {
+    try {
+      await axios.patch(`${API}/admin/partner-requests/${requestId}`, { status });
+      toast.success('Partner request updated');
+      fetchPartnerRequests();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Update failed');
+    }
+  };
+
+  const updateComplaintStatus = async (complaintId, status) => {
+    try {
+      await axios.patch(`${API}/admin/complaints/${complaintId}`, { status });
+      toast.success('Complaint updated');
+      fetchAdminComplaints();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Update failed');
     }
   };
 
@@ -297,6 +453,19 @@ const AdminDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="promos" data-testid="promos-tab">
               Promo codes
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              <Users className="w-4 h-4 mr-1 inline" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="trainers_manage">Trainers</TabsTrigger>
+            <TabsTrigger value="partners">
+              <Handshake className="w-4 h-4 mr-1 inline" />
+              Partners
+            </TabsTrigger>
+            <TabsTrigger value="complaints">
+              <AlertCircle className="w-4 h-4 mr-1 inline" />
+              Complaints
             </TabsTrigger>
           </TabsList>
 
@@ -532,6 +701,256 @@ const AdminDashboard = () => {
                           <Trash2 className="w-4 h-4 mr-1" />
                           Delete
                         </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users" className="mt-6 space-y-8">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Add user</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={createAdminUser} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={newUserForm.email}
+                      onChange={(e) => setNewUserForm((f) => ({ ...f, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Password</Label>
+                    <Input
+                      type="password"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm((f) => ({ ...f, password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      value={newUserForm.name}
+                      onChange={(e) => setNewUserForm((f) => ({ ...f, name: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Role</Label>
+                    <Select
+                      value={newUserForm.role}
+                      onValueChange={(v) => setNewUserForm((f) => ({ ...f, role: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">user</SelectItem>
+                        <SelectItem value="trainer">trainer</SelectItem>
+                        <SelectItem value="gym_owner">gym_owner</SelectItem>
+                        <SelectItem value="admin">admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Phone (optional)</Label>
+                    <Input
+                      value={newUserForm.phone}
+                      onChange={(e) => setNewUserForm((f) => ({ ...f, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="submit" disabled={creatingUser}>
+                      {creatingUser ? 'Creating…' : 'Create user'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Accounts ({adminUsers.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {adminUsers.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No users loaded.</p>
+                ) : (
+                  <ul className="divide-y divide-zinc-200 text-sm">
+                    {adminUsers.map((u) => (
+                      <li key={u.user_id} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <span className="font-medium">{u.name}</span>
+                          <span className="text-zinc-500 ml-2">{u.email}</span>
+                          <span className="text-zinc-400 ml-2 font-mono text-xs">{u.role}</span>
+                          {u.is_banned ? (
+                            <span className="ml-2 text-red-600 text-xs font-semibold">Banned</span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {u.is_banned ? (
+                            <Button size="sm" variant="outline" onClick={() => unbanUser(u.user_id)}>
+                              Unban
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (window.confirm(`Ban ${u.email}?`)) banUser(u.user_id);
+                              }}
+                            >
+                              Ban
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="trainers_manage" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Trainer accounts</CardTitle>
+                <p className="text-sm text-zinc-500 font-normal">
+                  Approve pending profiles, reject with onboarding, or ban the underlying user to remove access.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {managedTrainers.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No trainers.</p>
+                ) : (
+                  <ul className="divide-y divide-zinc-200 text-sm space-y-0">
+                    {managedTrainers.map((t) => (
+                      <li key={t.trainer_id} className="py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{t.name || t.email}</p>
+                          <p className="text-zinc-500 text-xs font-mono">{t.trainer_id}</p>
+                          <p className="text-zinc-600">
+                            {t.specialty} · {t.city} · approved: {t.approved ? 'yes' : 'no'}
+                            {t.rejected ? ' · rejected' : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {!t.approved ? (
+                            <>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => approveTrainerRow(t.trainer_id)}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => rejectTrainerRow(t.trainer_id)}>
+                                Reject
+                              </Button>
+                            </>
+                          ) : null}
+                          {t.is_banned ? (
+                            <Button size="sm" variant="outline" onClick={() => unbanUser(t.user_id)}>
+                              Unban user
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (window.confirm('Ban this trainer’s user account? They will not be able to sign in.')) {
+                                  banUser(t.user_id);
+                                }
+                              }}
+                            >
+                              Ban user
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="partners" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Partnership requests</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {partnerRequests.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No requests yet.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {partnerRequests.map((p) => (
+                      <li key={p.request_id} className="border border-zinc-200 rounded-lg p-4 space-y-2">
+                        <p className="font-semibold">{p.organization_name}</p>
+                        <p className="text-sm text-zinc-600">
+                          {p.contact_name} · {p.email} {p.phone ? `· ${p.phone}` : ''}
+                        </p>
+                        <p className="text-sm whitespace-pre-wrap">{p.message}</p>
+                        <p className="text-xs text-zinc-400">
+                          {p.created_at ? new Date(p.created_at).toLocaleString() : ''} ·{' '}
+                          <span className="font-mono">{p.status}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <Button size="sm" variant="outline" onClick={() => updatePartnerStatus(p.request_id, 'reviewed')}>
+                            Mark reviewed
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updatePartnerStatus(p.request_id, 'approved')}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => updatePartnerStatus(p.request_id, 'rejected')}>
+                            Reject
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="complaints" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>User ↔ trainer complaints</CardTitle>
+                <p className="text-sm text-zinc-500 font-normal">
+                  Filed by one account about another (trainers and members use the same complaint API).
+                </p>
+              </CardHeader>
+              <CardContent>
+                {adminComplaints.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No complaints.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {adminComplaints.map((c) => (
+                      <li key={c.complaint_id} className="border border-zinc-200 rounded-lg p-4 space-y-2 text-sm">
+                        <p className="font-semibold">{c.subject}</p>
+                        <p className="text-zinc-600 whitespace-pre-wrap">{c.body}</p>
+                        <p className="text-xs text-zinc-500">
+                          From: {c.from_name} ({c.from_email}) · About: {c.about_name} ({c.about_email})
+                        </p>
+                        <p className="text-xs font-mono text-zinc-400">{c.status}</p>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <Button size="sm" variant="outline" onClick={() => updateComplaintStatus(c.complaint_id, 'resolved')}>
+                            Resolved
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateComplaintStatus(c.complaint_id, 'dismissed')}>
+                            Dismissed
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => updateComplaintStatus(c.complaint_id, 'open')}>
+                            Reopen
+                          </Button>
+                        </div>
                       </li>
                     ))}
                   </ul>

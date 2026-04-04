@@ -8,6 +8,7 @@ class UserRegisterIn(BaseModel):
     name: str
     phone: Optional[str] = None
     role: str = "user"
+    referral_code: Optional[str] = None
 
 
 class UserLoginIn(BaseModel):
@@ -29,6 +30,19 @@ class UserOut(BaseModel):
     role: str
     is_verified: bool
     picture: Optional[str]
+    referral_code: Optional[str] = None
+
+
+class UserMeOut(UserOut):
+    referrals_count: int = 0
+
+
+class AdminUserCreateIn(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "user"
+    phone: Optional[str] = None
 
 
 class LoginOut(BaseModel):

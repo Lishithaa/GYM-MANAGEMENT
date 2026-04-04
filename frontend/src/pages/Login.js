@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,16 +10,24 @@ import { toast } from 'sonner';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+    if (!user) return;
+    const dashboardMap = {
+      gym_owner: '/gym-owner/dashboard',
+      trainer: '/trainer/dashboard',
+      admin: '/admin',
+      user: '/dashboard',
+    };
+    const target = dashboardMap[user.role] || '/dashboard';
+    if (location.pathname === target) return;
+    navigate(target, { replace: true });
+  }, [user, navigate, location.pathname]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -36,7 +44,7 @@ const Login = () => {
         admin: '/admin',
         user: '/dashboard'
       };
-      navigate(dashboardMap[loggedInUser?.role] || '/dashboard');
+      navigate(dashboardMap[loggedInUser?.role] || '/dashboard', { replace: false });
     } catch (error) {
       const detail = error?.response?.data?.detail;
       const message =

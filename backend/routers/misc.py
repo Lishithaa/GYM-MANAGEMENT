@@ -43,7 +43,7 @@ async def trainer_my_profile_compat(
         return None
     try:
         t = await trainer_service.get_trainer_by_user(db, user.user_id)
-        return TrainerOut.model_validate(t)
+        return trainer_service.to_trainer_out(t, user.name)
     except Exception:
         return None
 

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { recordNavigationPath } from '@/utils/goBack';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AuthCallback from '@/pages/AuthCallback';
@@ -21,7 +22,11 @@ import '@/App.css';
 
 function AppRouter() {
   const location = useLocation();
-  
+
+  useEffect(() => {
+    recordNavigationPath(location.pathname);
+  }, [location.pathname]);
+
   if (location.hash?.includes('session_id=')) {
     return <AuthCallback />;
   }

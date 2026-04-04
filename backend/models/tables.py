@@ -51,6 +51,9 @@ class User(Base):
     role = Column(SAEnum(UserRoleEnum), nullable=False, default=UserRoleEnum.USER)
     is_verified = Column(Boolean, nullable=False, default=False)
     picture = Column(String(500), nullable=True)
+    is_banned = Column(Boolean, nullable=False, default=False)
+    referral_code = Column(String(16), unique=True, nullable=True, index=True)
+    referred_by_user_id = Column(String(24), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, nullable=False, default=_now)
 
 
@@ -195,6 +198,7 @@ class Booking(Base):
     qr_code = Column(Text, nullable=True)
     idempotency_key = Column(String(64), unique=True, nullable=True, index=True)
     payment_id = Column(String(64), nullable=True)
+    razorpay_order_id = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime, nullable=False, default=_now)
     completed_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
@@ -275,4 +279,33 @@ class ContactMessage(Base):
     name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class PartnerRequest(Base):
+    __tablename__ = "partner_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    request_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("part"))
+    organization_name = Column(String(255), nullable=False)
+    contact_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    phone = Column(String(40), nullable=True)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="pending", index=True)
+    admin_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class Complaint(Base):
+    __tablename__ = "complaints"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    complaint_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("cmp"))
+    from_user_id = Column(String(24), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    about_user_id = Column(String(24), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    subject = Column(String(255), nullable=False)
+    body = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="open", index=True)
+    admin_resolution_note = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now)

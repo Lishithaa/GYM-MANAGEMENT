@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dumbbell, MapPin, Star, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { API } from '@/config';
+import { goBack } from '@/utils/goBack';
 
 const Gyms = () => {
   const navigate = useNavigate();
@@ -112,13 +113,13 @@ const Gyms = () => {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="mb-8">
           <Button
-            onClick={() => navigate('/')}
+            onClick={() => goBack(navigate, '/')}
             variant="ghost"
             className="mb-4"
             data-testid="back-button"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
+            Back
           </Button>
           <h1 className="text-5xl font-bold font-['Outfit'] tracking-tight mb-4">
             Browse Gyms

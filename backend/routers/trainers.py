@@ -1,11 +1,12 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from dependencies import get_current_user
 from models.tables import User
-from schemas.trainer import TrainerIn, TrainerOut
+from schemas.platform import TrainerLocationPatch
+from schemas.trainer import TrainerIn, TrainerOut, TrainerProfilePatch
 from schemas.trainer_onboarding import OnboardingStartOut, OnboardingStepPatchIn, TrainerOnboardingOut
 from services import audit_service, trainer_onboarding_service, trainer_service
 
@@ -33,13 +34,47 @@ async def list_trainers(
         lng=lng,
         radius_km=radius_km,
     )
-    return [TrainerOut.model_validate(t) for t in trainers]
+    names = await trainer_service.user_names_by_user_ids(db, [t.user_id for t in trainers])
+    return [trainer_service.to_trainer_out(t, names.get(t.user_id)) for t in trainers]
 
 
 @router.get("/me", response_model=TrainerOut)
 async def my_profile(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     t = await trainer_service.get_trainer_by_user(db, user.user_id)
-    return TrainerOut.model_validate(t)
+    return trainer_service.to_trainer_out(t, user.name)
+
+
+@router.patch("/me", response_model=TrainerOut)
+async def patch_my_profile(
+    body: TrainerProfilePatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    t = await trainer_service.update_trainer_profile(db, user.user_id, body)
+    await audit_service.record(db, "trainer.profile_updated", user.user_id, "trainer", t.trainer_id)
+    return trainer_service.to_trainer_out(t, user.name)
+
+
+@router.patch("/me/location", response_model=TrainerOut)
+async def patch_my_location(
+    body: TrainerLocationPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    t = await trainer_service.update_trainer_location(db, user.user_id, body.lat, body.lng)
+    return trainer_service.to_trainer_out(t, user.name)
+
+
+@router.post("/me/photo", response_model=TrainerOut)
+async def upload_my_profile_photo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    raw = await file.read()
+    t = await trainer_service.save_trainer_profile_photo(db, user.user_id, raw, file.content_type)
+    await audit_service.record(db, "trainer.photo_uploaded", user.user_id, "trainer", t.trainer_id)
+    return trainer_service.to_trainer_out(t, user.name)
 
 
 @router.get("/me/verification-status")
@@ -128,7 +163,7 @@ async def create_profile(
     user: User = Depends(get_current_user),
 ):
     t = await trainer_service.create_trainer_profile(db, user.user_id, body)
-    return TrainerOut.model_validate(t)
+    return trainer_service.to_trainer_out(t, user.name)
 
 
 @router.get("/{trainer_id}/availability")
@@ -139,4 +174,5 @@ async def get_availability(trainer_id: str, date: str, db: AsyncSession = Depend
 @router.get("/{trainer_id}", response_model=TrainerOut)
 async def get_trainer(trainer_id: str, db: AsyncSession = Depends(get_db)):
     t = await trainer_service.get_public_trainer_by_id(db, trainer_id)
-    return TrainerOut.model_validate(t)
+    names = await trainer_service.user_names_by_user_ids(db, [t.user_id])
+    return trainer_service.to_trainer_out(t, names.get(t.user_id))

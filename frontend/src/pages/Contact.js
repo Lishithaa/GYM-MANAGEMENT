@@ -10,6 +10,7 @@ import { Dumbbell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
+import { goBack } from '@/utils/goBack';
 
 const Contact = () => {
   const navigate = useNavigate();
@@ -20,6 +21,14 @@ const Contact = () => {
     message: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [partnerForm, setPartnerForm] = useState({
+    organization_name: '',
+    contact_name: '',
+    email: '',
+    phone: '',
+    message: ''
+  });
+  const [partnerSubmitting, setPartnerSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +48,30 @@ const Contact = () => {
       toast.error('Failed to send message. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePartnerSubmit = async (e) => {
+    e.preventDefault();
+    if (!partnerForm.organization_name || !partnerForm.contact_name || !partnerForm.email || !partnerForm.message) {
+      toast.error('Please fill organization, contact name, email, and message');
+      return;
+    }
+    setPartnerSubmitting(true);
+    try {
+      await axios.post(`${API}/partner-requests`, partnerForm);
+      toast.success('Partnership request received. We will contact you soon.');
+      setPartnerForm({
+        organization_name: '',
+        contact_name: '',
+        email: '',
+        phone: '',
+        message: ''
+      });
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not submit request');
+    } finally {
+      setPartnerSubmitting(false);
     }
   };
 
@@ -74,13 +107,13 @@ const Contact = () => {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         <Button
-          onClick={() => navigate('/')}
+          onClick={() => goBack(navigate, '/')}
           variant="ghost"
           className="mb-6"
           data-testid="back-button"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
+          Back
         </Button>
 
         <h1 className="text-5xl font-bold font-['Outfit'] tracking-tight mb-4">
@@ -133,6 +166,63 @@ const Contact = () => {
                 data-testid="contact-submit-button"
               >
                 {submitting ? 'Sending...' : 'Send Message'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <h2 className="text-2xl font-bold font-['Outfit'] tracking-tight mt-12 mb-4">Partner with us</h2>
+        <p className="text-zinc-600 mb-6 text-sm">
+          Gyms, corporates, and wellness brands — tell us about your partnership goals.
+        </p>
+        <Card className="border-zinc-200">
+          <CardContent className="p-8">
+            <form onSubmit={handlePartnerSubmit} className="space-y-6">
+              <div>
+                <Label htmlFor="org">Organization name</Label>
+                <Input
+                  id="org"
+                  value={partnerForm.organization_name}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, organization_name: e.target.value })}
+                  placeholder="Company or gym name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="pname">Contact name</Label>
+                <Input
+                  id="pname"
+                  value={partnerForm.contact_name}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, contact_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="pemail">Email</Label>
+                <Input
+                  id="pemail"
+                  type="email"
+                  value={partnerForm.email}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="pphone">Phone (optional)</Label>
+                <Input
+                  id="pphone"
+                  value={partnerForm.phone}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="pmsg">Message</Label>
+                <Textarea
+                  id="pmsg"
+                  rows={4}
+                  value={partnerForm.message}
+                  onChange={(e) => setPartnerForm({ ...partnerForm, message: e.target.value })}
+                />
+              </div>
+              <Button type="submit" className="w-full bg-zinc-900 text-white hover:bg-zinc-800 rounded-md" disabled={partnerSubmitting}>
+                {partnerSubmitting ? 'Sending…' : 'Submit partnership request'}
               </Button>
             </form>
           </CardContent>

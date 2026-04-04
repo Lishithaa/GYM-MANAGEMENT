@@ -32,11 +32,34 @@ class TrainerIn(BaseModel):
     lng: Optional[float] = None
 
 
+class TrainerProfilePatch(BaseModel):
+    """Partial update for the logged-in trainer (PATCH /trainers/me)."""
+
+    bio: Optional[str] = None
+    photo: Optional[str] = None
+    specialty: Optional[str] = None
+    hourly_rate: Optional[float] = None
+    city: Optional[str] = None
+    area: Optional[str] = None
+    gender: Optional[str] = None
+    languages: Optional[List[str]] = None
+    certifications: Optional[str] = None
+    video_intro: Optional[str] = None
+    travel_radius: Optional[int] = None
+    available_days: Optional[List[str]] = None
+    service_areas: Optional[List[str]] = None
+    availability_slots: Optional[List[str]] = None
+    experience_brief: Optional[str] = None
+    certification_upload_urls: Optional[List[str]] = None
+    photo_branding_enabled: Optional[bool] = None
+
+
 class TrainerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     trainer_id: str
     user_id: str
+    trainer_name: Optional[str] = None
     bio: str
     photo: str
     specialty: str
@@ -51,6 +74,9 @@ class TrainerOut(BaseModel):
     available_days: List[str]
     service_areas: List[str]
     availability_slots: List[str]
+    experience_brief: Optional[str] = None
+    certification_upload_urls: List[str] = []
+    photo_branding_enabled: bool = True
     lat: Optional[float]
     lng: Optional[float]
     approved: bool

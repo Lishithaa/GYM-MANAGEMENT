@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dumbbell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { API } from '@/config';
+import { goBack } from '@/utils/goBack';
 
 const BookingDetail = () => {
   const { id } = useParams();
@@ -30,6 +32,17 @@ const BookingDetail = () => {
   useEffect(() => {
     fetchBooking();
   }, [fetchBooking]);
+
+  const cancelInitiated = async () => {
+    try {
+      await axios.post(`${API}/bookings/${id}/cancel`);
+      toast.success('Booking cancelled — slot released');
+      fetchBooking();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : 'Could not cancel');
+    }
+  };
 
   if (loading) {
     return (
@@ -67,13 +80,21 @@ const BookingDetail = () => {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         <Button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => {
+            const fallback =
+              user?.role === 'trainer'
+                ? '/trainer/dashboard'
+                : user?.role === 'admin'
+                  ? '/admin'
+                  : '/dashboard';
+            goBack(navigate, fallback);
+          }}
           variant="ghost"
           className="mb-6"
           data-testid="back-button"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Dashboard
+          Back
         </Button>
 
         <Card className="border-zinc-200">
@@ -81,6 +102,19 @@ const BookingDetail = () => {
             <h1 className="text-3xl font-bold font-['Outfit'] tracking-tight mb-6">
               Booking Confirmation
             </h1>
+
+            {booking.status === 'initiated' && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-medium">Payment not completed</p>
+                <p className="mt-1 text-amber-800">
+                  This slot is on hold until you finish Razorpay checkout. If you closed the payment window, cancel this
+                  hold and book again.
+                </p>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={cancelInitiated}>
+                  Cancel unpaid booking
+                </Button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <div>
@@ -117,12 +151,16 @@ const BookingDetail = () => {
                 Show this QR code at the gym for check-in
               </p>
               <div className="flex justify-center mb-4">
-                <img
-                  src={`data:image/png;base64,${booking.qr_code}`}
-                  alt="Booking QR Code"
-                  className="w-64 h-64 border-2 border-zinc-200 p-4"
-                  data-testid="qr-code-image"
-                />
+                {booking.qr_code ? (
+                  <img
+                    src={`data:image/png;base64,${booking.qr_code}`}
+                    alt="Booking QR Code"
+                    className="w-64 h-64 border-2 border-zinc-200 p-4"
+                    data-testid="qr-code-image"
+                  />
+                ) : (
+                  <p className="text-sm text-zinc-500">QR not available for this booking.</p>
+                )}
               </div>
               <p className="text-xs text-zinc-500 font-mono">{booking.booking_id}</p>
             </div>

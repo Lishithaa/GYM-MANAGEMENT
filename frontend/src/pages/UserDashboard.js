@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -7,14 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Dumbbell, Calendar, LogOut, Star } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dumbbell, Calendar, LogOut, Star, Gift, MessageSquareWarning } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, checkAuth } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [showReview, setShowReview] = useState(false);
   const [reviewData, setReviewData] = useState({
@@ -23,6 +25,24 @@ const UserDashboard = () => {
     rating: 5,
     comment: ''
   });
+  const [complaintMine, setComplaintMine] = useState({ filed_by_me: [], about_me: [] });
+  const [complaintForm, setComplaintForm] = useState({
+    about_trainer_id: '',
+    subject: '',
+    body: ''
+  });
+
+  const fetchMyComplaints = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/complaints/mine`);
+      setComplaintMine({
+        filed_by_me: data?.filed_by_me || [],
+        about_me: data?.about_me || []
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   useEffect(() => {
     if (user?.role && user.role !== 'user') {
@@ -34,8 +54,16 @@ const UserDashboard = () => {
       navigate(dashboardMap[user.role] || '/dashboard');
       return;
     }
-    fetchBookings();
+    if (user?.role === 'user') {
+      fetchBookings();
+    }
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (user?.role !== 'user' || !user?.user_id) return;
+    checkAuth();
+    fetchMyComplaints();
+  }, [user?.user_id, user?.role, checkAuth, fetchMyComplaints]);
 
   const fetchBookings = async () => {
     try {
@@ -50,7 +78,35 @@ const UserDashboard = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    navigate('/', { replace: true });
+  };
+
+  const copyReferralLink = () => {
+    const code = user?.referral_code || '';
+    if (!code) return;
+    const url = `${window.location.origin}/login?ref=${encodeURIComponent(code)}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Referral link copied');
+  };
+
+  const submitComplaint = async (e) => {
+    e.preventDefault();
+    if (!complaintForm.about_trainer_id || !complaintForm.subject.trim() || !complaintForm.body.trim()) {
+      toast.error('Choose a trainer and fill subject and details');
+      return;
+    }
+    try {
+      await axios.post(`${API}/complaints`, {
+        about_trainer_id: complaintForm.about_trainer_id,
+        subject: complaintForm.subject.trim(),
+        body: complaintForm.body.trim()
+      });
+      toast.success('Complaint submitted');
+      setComplaintForm({ about_trainer_id: '', subject: '', body: '' });
+      fetchMyComplaints();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not submit');
+    }
   };
 
   const openReviewDialog = (targetId, targetType) => {
@@ -83,15 +139,29 @@ const UserDashboard = () => {
     }
   };
 
+  const startOfToday = () => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  };
+
   const upcomingBookings = bookings.filter((b) => {
-    const bookingDate = new Date(b.date);
-    return bookingDate >= new Date() && b.status === 'confirmed';
+    const d = new Date(b.date);
+    d.setHours(0, 0, 0, 0);
+    if (d < startOfToday()) return false;
+    return b.status === 'confirmed' || b.status === 'initiated';
   });
 
   const pastBookings = bookings.filter((b) => {
-    const bookingDate = new Date(b.date);
-    return bookingDate < new Date() || b.status !== 'confirmed';
+    if (b.status === 'completed' || b.status === 'cancelled') return true;
+    const d = new Date(b.date);
+    d.setHours(0, 0, 0, 0);
+    return d < startOfToday();
   });
+
+  const trainerIdsFromBookings = [
+    ...new Set(bookings.filter((b) => b.target_type === 'trainer').map((b) => b.target_id))
+  ];
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -132,9 +202,11 @@ const UserDashboard = () => {
         </h1>
 
         <Tabs defaultValue="upcoming" className="w-full">
-          <TabsList>
+          <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="upcoming" data-testid="upcoming-tab">Upcoming Bookings</TabsTrigger>
             <TabsTrigger value="past" data-testid="past-tab">Past Bookings</TabsTrigger>
+            <TabsTrigger value="referrals">Referrals</TabsTrigger>
+            <TabsTrigger value="support">Complaints</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-6">
@@ -168,16 +240,19 @@ const UserDashboard = () => {
                       <p className="text-sm text-zinc-600 mb-2">
                         <strong>Time:</strong> {booking.start_time} - {booking.end_time}
                       </p>
-                      <p className="text-sm text-zinc-600 mb-4">
+                      <p className="text-sm text-zinc-600 mb-2">
                         <strong>Amount:</strong> ₹{booking.amount}
                       </p>
+                      {booking.status === 'initiated' && (
+                        <p className="text-xs text-amber-700 mb-3">Payment pending — finish checkout or cancel this hold.</p>
+                      )}
                       <Button
                         onClick={() => navigate(`/booking/${booking.booking_id}`)}
                         className="w-full bg-black text-white hover:bg-zinc-800 rounded-md"
                         size="sm"
                         data-testid={`view-booking-${booking.booking_id}`}
                       >
-                        View QR Code
+                        {booking.status === 'initiated' ? 'View / manage' : 'View QR Code'}
                       </Button>
                     </CardContent>
                   </Card>
@@ -227,6 +302,127 @@ const UserDashboard = () => {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="referrals" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="w-5 h-5" />
+                  Invite friends
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-zinc-600">
+                  Share your code so new members can sign up with your referral. You will see how many people joined
+                  using your link.
+                </p>
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Your code</p>
+                  <p className="text-2xl font-mono font-bold">{user?.referral_code || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Successful referrals</p>
+                  <p className="text-xl font-semibold">{user?.referrals_count ?? 0}</p>
+                </div>
+                <Button type="button" variant="outline" onClick={copyReferralLink} disabled={!user?.referral_code}>
+                  Copy invite link
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="support" className="mt-6 space-y-8">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquareWarning className="w-5 h-5" />
+                  Report an issue about a trainer
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={submitComplaint} className="space-y-4 max-w-lg">
+                  <div>
+                    <Label>Trainer (from your bookings)</Label>
+                    <Select
+                      value={complaintForm.about_trainer_id}
+                      onValueChange={(v) => setComplaintForm({ ...complaintForm, about_trainer_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select trainer ID" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trainerIdsFromBookings.map((tid) => (
+                          <SelectItem key={tid} value={tid}>
+                            {tid}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {trainerIdsFromBookings.length === 0 ? (
+                      <p className="text-xs text-zinc-500 mt-1">Book a trainer first to enable this form.</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <Label htmlFor="csub">Subject</Label>
+                    <Input
+                      id="csub"
+                      value={complaintForm.subject}
+                      onChange={(e) => setComplaintForm({ ...complaintForm, subject: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cbody">Details</Label>
+                    <Textarea
+                      id="cbody"
+                      rows={4}
+                      value={complaintForm.body}
+                      onChange={(e) => setComplaintForm({ ...complaintForm, body: e.target.value })}
+                    />
+                  </div>
+                  <Button type="submit" className="bg-zinc-900 text-white hover:bg-zinc-800 rounded-md">
+                    Submit complaint
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="border-zinc-200">
+                <CardHeader>
+                  <CardTitle className="text-base">Filed by you</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {(complaintMine.filed_by_me || []).length === 0 ? (
+                    <p className="text-zinc-500">None yet</p>
+                  ) : (
+                    complaintMine.filed_by_me.map((c) => (
+                      <div key={c.complaint_id} className="border-b border-zinc-100 pb-2">
+                        <p className="font-medium">{c.subject}</p>
+                        <p className="text-zinc-600 text-xs capitalize">Status: {c.status}</p>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border-zinc-200">
+                <CardHeader>
+                  <CardTitle className="text-base">About you</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {(complaintMine.about_me || []).length === 0 ? (
+                    <p className="text-zinc-500">None</p>
+                  ) : (
+                    complaintMine.about_me.map((c) => (
+                      <div key={c.complaint_id} className="border-b border-zinc-100 pb-2">
+                        <p className="font-medium">{c.subject}</p>
+                        <p className="text-zinc-600 text-xs capitalize">Status: {c.status}</p>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

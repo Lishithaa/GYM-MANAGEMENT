@@ -8,7 +8,7 @@ from config import settings
 from database import get_db
 from dependencies import get_current_user
 from models.tables import User
-from schemas.auth import LoginOut, TokenRefreshIn, UserOut, UserRegisterIn, UserLoginIn
+from schemas.auth import LoginOut, TokenRefreshIn, UserMeOut, UserOut, UserRegisterIn, UserLoginIn
 from services import auth_service
 from services.email_service import send_verification_email
 from utils.jwt_utils import decode_token, create_verify_token
@@ -27,7 +27,13 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     user, token = await auth_service.register_user(
-        db, body.email, body.password, body.name, body.role, body.phone
+        db,
+        body.email,
+        body.password,
+        body.name,
+        body.role,
+        body.phone,
+        body.referral_code,
     )
     bg.add_task(send_verification_email, user.email, user.name, token)
     return {
@@ -108,6 +114,12 @@ async def resend_verification(
     return {"message": "Verification email re-sent. Please check your inbox."}
 
 
-@router.get("/me", response_model=UserOut)
-async def me(current_user: User = Depends(get_current_user)):
-    return UserOut.model_validate(current_user)
+@router.get("/me", response_model=UserMeOut)
+async def me(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await auth_service.ensure_referral_code(db, current_user)
+    referrals_count = await auth_service.count_referrals(db, current_user.user_id)
+    base = UserOut.model_validate(current_user)
+    return UserMeOut(**base.model_dump(), referrals_count=referrals_count)

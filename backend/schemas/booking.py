@@ -14,6 +14,12 @@ class BookingIn(BaseModel):
     idempotency_key: Optional[str] = None
 
 
+class RazorpayConfirmIn(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
 class BookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -31,9 +37,18 @@ class BookingOut(BaseModel):
     status: str
     qr_code: Optional[str]
     payment_id: Optional[str]
+    razorpay_order_id: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime]
     cancelled_at: Optional[datetime]
+
+
+class BookingCreateResult(BaseModel):
+    booking: BookingOut
+    razorpay_key_id: str
+    razorpay_order_id: str
+    amount: int
+    currency: str = "INR"
 
 
 class ReviewIn(BaseModel):

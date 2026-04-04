@@ -52,6 +52,9 @@ dump.rdb
 .DS_Store
 *.pem
 
+# Uploaded trainer photos (local dev)
+backend/uploads/
+
 # Python
 __pycache__/
 *pyc*

@@ -1,8 +1,10 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -10,7 +12,7 @@ from slowapi.util import get_remote_address
 
 from config import settings
 from database import AsyncSessionLocal, Base, engine
-from routers import auth, trainers, bookings, reviews, admin, misc
+from routers import auth, trainers, bookings, reviews, admin, misc, platform
 from services.admin_seed_service import ensure_default_admin
 
 logging.basicConfig(
@@ -72,3 +74,9 @@ app.include_router(bookings.router)
 app.include_router(reviews.router)
 app.include_router(admin.router)
 app.include_router(misc.router)
+app.include_router(platform.router)
+
+_uploads_root = Path(__file__).resolve().parent / "uploads"
+_uploads_root.mkdir(exist_ok=True)
+(_uploads_root / "trainers").mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_root)), name="uploads")

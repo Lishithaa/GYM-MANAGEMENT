@@ -4,12 +4,15 @@ import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dumbbell, MapPin, Star, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
+import { goBack } from '@/utils/goBack';
+import { TrainerShowcaseCard } from '@/components/TrainerShowcaseCard';
+import { BookingScheduleFields, parseBookingScheduleForm } from '@/components/BookingScheduleFields';
+import { openRazorpayAndConfirm, sessionDurationHours } from '@/utils/razorpayCheckout';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 
 const GymDetail = () => {
   const { id } = useParams();
@@ -19,11 +22,13 @@ const GymDetail = () => {
   const [trainers, setTrainers] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [showBooking, setShowBooking] = useState(false);
-  const [bookingData, setBookingData] = useState({
-    date: '',
-    start_time: '',
-    end_time: ''
-  });
+  const [bookingFormKey, setBookingFormKey] = useState(0);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+
+  const openBookingDialog = () => {
+    setBookingFormKey((k) => k + 1);
+    setShowBooking(true);
+  };
   const [loading, setLoading] = useState(true);
 
   const fetchGymDetails = useCallback(async () => {
@@ -64,47 +69,66 @@ const GymDetail = () => {
     fetchReviews();
   }, [fetchGymDetails, fetchTrainers, fetchReviews]);
 
-  const handleBooking = async () => {
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
     if (!user) {
       navigate('/login');
       return;
     }
 
-    if (!bookingData.date || !bookingData.start_time || !bookingData.end_time) {
-      toast.error('Please fill all booking details');
+    const parsed = parseBookingScheduleForm(e.currentTarget);
+    if (parsed.error) {
+      toast.error(parsed.error);
       return;
     }
+    const { date, start_time, end_time } = parsed;
 
-    const startHour = parseInt(bookingData.start_time.split(':')[0]);
-    const endHour = parseInt(bookingData.end_time.split(':')[0]);
-    const hours = endHour - startHour;
-
+    const hours = sessionDurationHours(start_time, end_time);
     if (hours <= 0) {
       toast.error('End time must be after start time');
       return;
     }
 
-    const amount = gym.hourly_rate * hours;
+    const amount = Math.round(Number(gym.hourly_rate) * hours * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Could not compute session price — refresh the page and try again.');
+      return;
+    }
 
+    setBookingSubmitting(true);
     try {
-      const response = await axios.post(
-        `${API}/bookings`,
-        {
-          target_id: id,
-          target_type: 'gym',
-          date: bookingData.date,
-          start_time: bookingData.start_time,
-          end_time: bookingData.end_time,
-          amount
-        },
-        { withCredentials: true }
-      );
+      const { data } = await axios.post(`${API}/bookings`, {
+        target_id: id,
+        target_type: 'gym',
+        date,
+        start_time,
+        end_time,
+        amount,
+      });
 
-      toast.success('Booking confirmed!');
-      navigate(`/booking/${response.data.booking_id}`);
+      const { booking, razorpay_key_id, razorpay_order_id, amount: amountPaise } = data;
+      if (!booking?.booking_id || !razorpay_key_id || !razorpay_order_id) {
+        toast.error('Unexpected response from server');
+        return;
+      }
+
+      await openRazorpayAndConfirm({
+        keyId: razorpay_key_id,
+        orderId: razorpay_order_id,
+        amountPaise,
+        bookingId: booking.booking_id,
+        userName: user.name,
+        userEmail: user.email,
+        description: `Gym session · ${gym.name}`,
+        navigate,
+        toast,
+      });
+      setShowBooking(false);
     } catch (error) {
       console.error('Booking error:', error);
-      toast.error('Booking failed. Please try again.');
+      toast.error(getApiErrorMessage(error, 'Could not start booking. Please try again.'));
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -146,13 +170,13 @@ const GymDetail = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-12">
         <Button
-          onClick={() => navigate('/gyms')}
+          onClick={() => goBack(navigate, '/gyms')}
           variant="ghost"
           className="mb-6"
           data-testid="back-button"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Gyms
+          Back
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -204,26 +228,15 @@ const GymDetail = () => {
             {trainers.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-xl font-bold font-['Outfit'] mb-4">Trainers at this Gym</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {trainers.map((trainer) => (
-                    <Card
+                    <TrainerShowcaseCard
                       key={trainer.trainer_id}
-                      className="border-zinc-200 cursor-pointer hover:shadow-md transition-shadow"
+                      trainer={trainer}
+                      variant="compact"
                       onClick={() => navigate(`/trainers/${trainer.trainer_id}`)}
                       data-testid={`trainer-card-${trainer.trainer_id}`}
-                    >
-                      <CardContent className="p-4 flex gap-4">
-                        <img
-                          src={trainer.photo}
-                          alt={trainer.user_id}
-                          className="w-16 h-16 rounded-full object-cover"
-                        />
-                        <div>
-                          <p className="font-bold">{trainer.specialty}</p>
-                          <p className="text-sm text-zinc-600">₹{trainer.hourly_rate}/hour</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    />
                   ))}
                 </div>
               </div>
@@ -261,7 +274,7 @@ const GymDetail = () => {
                   ₹{gym.hourly_rate}/hour
                 </p>
                 <Button
-                  onClick={() => setShowBooking(true)}
+                  onClick={openBookingDialog}
                   className="w-full bg-black text-white hover:bg-zinc-800 rounded-md"
                   size="lg"
                   data-testid="book-now-button"
@@ -280,45 +293,18 @@ const GymDetail = () => {
             <DialogTitle>Book {gym.name}</DialogTitle>
           </DialogHeader>
           <p id="booking-dialog-description" className="sr-only">Select date and time to book this gym</p>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={bookingData.date}
-                onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
-                data-testid="booking-date-input"
-              />
-            </div>
-            <div>
-              <Label htmlFor="start_time">Start Time</Label>
-              <Input
-                id="start_time"
-                type="time"
-                value={bookingData.start_time}
-                onChange={(e) => setBookingData({ ...bookingData, start_time: e.target.value })}
-                data-testid="booking-start-time-input"
-              />
-            </div>
-            <div>
-              <Label htmlFor="end_time">End Time</Label>
-              <Input
-                id="end_time"
-                type="time"
-                value={bookingData.end_time}
-                onChange={(e) => setBookingData({ ...bookingData, end_time: e.target.value })}
-                data-testid="booking-end-time-input"
-              />
-            </div>
+          <form key={bookingFormKey} noValidate onSubmit={handleBookingSubmit} className="space-y-4">
+            <BookingScheduleFields dateInputId="gym-book-date" dateTestId="booking-date-input" />
+            <p className="text-xs text-zinc-500">Payment is completed with Razorpay before the booking is confirmed.</p>
             <Button
-              onClick={handleBooking}
+              type="submit"
+              disabled={bookingSubmitting}
               className="w-full bg-blue-600 text-white hover:bg-blue-700 rounded-md"
               data-testid="confirm-booking-button"
             >
-              Confirm Booking
+              {bookingSubmitting ? 'Starting checkout…' : 'Pay with Razorpay'}
             </Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
