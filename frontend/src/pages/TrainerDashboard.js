@@ -49,6 +49,8 @@ const TrainerDashboard = () => {
   const [cities, setCities] = useState([]);
   const [areas, setAreas] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  /** From GET /trainers/me/verification-status — distinguishes submitted onboarding vs generic pending */
+  const [verificationInfo, setVerificationInfo] = useState(null);
   const [profileForm, setProfileForm] = useState({
     city: '',
     area: '',
@@ -87,6 +89,18 @@ const TrainerDashboard = () => {
         console.error('Error fetching profile:', error);
       }
       setMyProfile(null);
+    }
+  }, []);
+
+  const fetchVerificationStatus = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/trainers/me/verification-status`);
+      setVerificationInfo(data);
+    } catch (error) {
+      if (error?.response?.status !== 404) {
+        console.error('Error fetching verification status:', error);
+      }
+      setVerificationInfo(null);
     }
   }, []);
 
@@ -147,8 +161,9 @@ const TrainerDashboard = () => {
       return;
     }
     fetchMyProfile();
+    fetchVerificationStatus();
     fetchCities();
-  }, [user, navigate, fetchMyProfile]);
+  }, [user, navigate, fetchMyProfile, fetchVerificationStatus]);
 
   useEffect(() => {
     if (myProfile) {
@@ -159,6 +174,43 @@ const TrainerDashboard = () => {
   useEffect(() => {
     calculateEarnings();
   }, [calculateEarnings]);
+
+  /** True once DB says approved — includes verification API so we are not stuck on stale /trainers/me. */
+  const isTrainerApproved =
+    Boolean(myProfile?.approved) ||
+    verificationInfo?.approved === true ||
+    verificationInfo?.onboarding_status === 'approved';
+
+  useEffect(() => {
+    if (user?.role !== 'trainer') return undefined;
+    let debounceTimer;
+    const refresh = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchMyProfile();
+        fetchVerificationStatus();
+      }, 400);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearTimeout(debounceTimer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user?.role, fetchMyProfile, fetchVerificationStatus]);
+
+  useEffect(() => {
+    if (user?.role !== 'trainer' || !myProfile || myProfile.approved) return undefined;
+    const id = setInterval(() => {
+      fetchMyProfile();
+      fetchVerificationStatus();
+    }, 25000);
+    return () => clearInterval(id);
+  }, [user?.role, myProfile?.approved, myProfile?.trainer_id, fetchMyProfile, fetchVerificationStatus]);
 
   const handleOnboardingNext = async (e) => {
     e.preventDefault();
@@ -245,6 +297,7 @@ const TrainerDashboard = () => {
       setShowOnboardingForm(false);
       setOnboardingPage(1);
       fetchMyProfile();
+      fetchVerificationStatus();
     } catch (error) {
       console.error('Onboarding submit error:', error);
       toast.error(error?.response?.data?.detail || 'Failed to submit onboarding');
@@ -257,6 +310,58 @@ const TrainerDashboard = () => {
     await logout();
     navigate('/');
   };
+
+  const openOnboardingForRevision = async () => {
+    try {
+      const response = await axios.post(`${API}/trainers/onboarding/start`);
+      setOnboardingId(response.data.onboarding_id);
+      setOnboardingPage(1);
+      setShowOnboardingForm(true);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Could not open onboarding');
+    }
+  };
+
+  const trainerStatusCopy = () => {
+    if (isTrainerApproved) {
+      return {
+        label: 'Approved',
+        hint: 'You can accept bookings from clients.',
+      };
+    }
+    const os = verificationInfo?.onboarding_status;
+    if (verificationInfo?.rejected || os === 'rejected') {
+      return {
+        label: 'Application not approved',
+        hint: verificationInfo?.admin_reason || 'Contact support if you need help.',
+      };
+    }
+    if (os === 'under_review') {
+      return {
+        label: 'Awaiting admin review',
+        hint:
+          'You already submitted onboarding. An admin will review it shortly; you will be able to take bookings after approval.',
+      };
+    }
+    if (os === 'rework_required') {
+      return {
+        label: 'Changes requested',
+        hint: verificationInfo?.admin_reason || 'Please update your application and submit again.',
+      };
+    }
+    if (os === 'draft' || os === 'submitted') {
+      return {
+        label: 'Onboarding in progress',
+        hint: 'Finish all steps and submit so our team can review your profile.',
+      };
+    }
+    return {
+      label: 'Pending approval',
+      hint: 'Your profile will go live after verification.',
+    };
+  };
+
+  const statusBlock = myProfile ? trainerStatusCopy() : null;
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -296,6 +401,33 @@ const TrainerDashboard = () => {
           </Card>
         ) : (
           <>
+            {verificationInfo?.onboarding_status === 'under_review' && !isTrainerApproved && (
+              <Card className="border-amber-200 bg-amber-50/80 mb-6">
+                <CardContent className="p-4 text-sm text-amber-950">
+                  <p className="font-semibold">Onboarding submitted</p>
+                  <p className="text-amber-900/90 mt-1">
+                    Your application is in the admin queue. You do not need to submit again unless we ask for changes.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            {verificationInfo?.onboarding_status === 'rework_required' && !isTrainerApproved && (
+              <Card className="border-orange-200 bg-orange-50/80 mb-6">
+                <CardContent className="p-4 text-sm text-orange-950 space-y-3">
+                  <div>
+                    <p className="font-semibold">Admin requested updates</p>
+                    {verificationInfo.admin_reason ? (
+                      <p className="text-orange-900/90 mt-1 whitespace-pre-wrap">{verificationInfo.admin_reason}</p>
+                    ) : (
+                      <p className="text-orange-900/90 mt-1">Please revise your onboarding and submit again.</p>
+                    )}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={openOnboardingForRevision}>
+                    Revise application
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card className="border-zinc-200">
                 <CardContent className="p-6">
@@ -355,9 +487,10 @@ const TrainerDashboard = () => {
                         </div>
                         <div>
                           <p className="text-sm text-zinc-600">Status</p>
-                          <p className="font-medium capitalize">
-                            {myProfile.approved ? 'Approved' : 'Pending Approval'}
-                          </p>
+                          <p className="font-medium">{statusBlock?.label}</p>
+                          {statusBlock?.hint ? (
+                            <p className="text-sm text-zinc-500 mt-1">{statusBlock.hint}</p>
+                          ) : null}
                         </div>
                         <div>
                           <p className="text-sm text-zinc-600">Bio</p>

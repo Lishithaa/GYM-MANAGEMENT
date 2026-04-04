@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.tables import (
@@ -309,11 +309,24 @@ def mask_onboarding_sensitive(onboarding: TrainerOnboarding) -> dict:
     }
 
 
+def _onboarding_status_priority():
+    """Prefer review pipeline rows over a newer draft row (same user can have multiple applications)."""
+    return case(
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.REWORK_REQUIRED, 1),
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.UNDER_REVIEW, 2),
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.SUBMITTED, 3),
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.DRAFT, 4),
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.APPROVED, 5),
+        (TrainerOnboarding.status == TrainerOnboardingStatusEnum.REJECTED, 6),
+        else_=7,
+    )
+
+
 async def get_my_onboarding(db: AsyncSession, user_id: str) -> TrainerOnboarding:
     result = await db.execute(
         select(TrainerOnboarding)
         .where(TrainerOnboarding.user_id == user_id)
-        .order_by(TrainerOnboarding.created_at.desc())
+        .order_by(_onboarding_status_priority(), TrainerOnboarding.updated_at.desc())
         .limit(1)
     )
     onboarding = result.scalar_one_or_none()
@@ -322,10 +335,42 @@ async def get_my_onboarding(db: AsyncSession, user_id: str) -> TrainerOnboarding
     return onboarding
 
 
-async def list_pending_onboardings(db: AsyncSession) -> list[TrainerOnboarding]:
+async def approve_onboarding_for_trainer_if_pending(db: AsyncSession, trainer_id: str) -> None:
+    """When approving via legacy admin path, keep onboarding row consistent."""
     result = await db.execute(
         select(TrainerOnboarding)
-        .where(TrainerOnboarding.status == TrainerOnboardingStatusEnum.UNDER_REVIEW)
+        .where(
+            TrainerOnboarding.trainer_id == trainer_id,
+            TrainerOnboarding.status.in_(
+                (
+                    TrainerOnboardingStatusEnum.UNDER_REVIEW,
+                    TrainerOnboardingStatusEnum.SUBMITTED,
+                )
+            ),
+        )
+        .order_by(TrainerOnboarding.updated_at.desc())
+        .limit(1)
+    )
+    o = result.scalar_one_or_none()
+    if not o:
+        return
+    o.status = TrainerOnboardingStatusEnum.APPROVED
+    o.reviewed_at = datetime.now(timezone.utc)
+    o.admin_reason = None
+
+
+async def list_pending_onboardings(db: AsyncSession) -> list[TrainerOnboarding]:
+    """Queued for admin review (submitted path). Includes SUBMITTED for older rows."""
+    result = await db.execute(
+        select(TrainerOnboarding)
+        .where(
+            TrainerOnboarding.status.in_(
+                (
+                    TrainerOnboardingStatusEnum.UNDER_REVIEW,
+                    TrainerOnboardingStatusEnum.SUBMITTED,
+                )
+            )
+        )
         .order_by(TrainerOnboarding.submitted_at.asc())
     )
     return list(result.scalars().all())

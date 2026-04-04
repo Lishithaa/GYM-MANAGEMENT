@@ -26,6 +26,8 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [dashboard, setDashboard] = useState(null);
   const [onboardingPending, setOnboardingPending] = useState([]);
+  /** Unapproved trainers not tied to an onboarding row in review (e.g. legacy POST /trainers). */
+  const [legacyPendingTrainers, setLegacyPendingTrainers] = useState([]);
   const [cityStats, setCityStats] = useState([]);
   const [promos, setPromos] = useState([]);
   const [promoForm, setPromoForm] = useState(emptyPromoForm);
@@ -42,12 +44,23 @@ const AdminDashboard = () => {
     }
   }, []);
 
-  const fetchOnboarding = useCallback(async () => {
+  const fetchReviewQueues = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/admin/trainers/onboarding/pending`);
-      setOnboardingPending(data);
+      const [onbRes, pendRes] = await Promise.all([
+        axios.get(`${API}/admin/trainers/onboarding/pending`),
+        axios.get(`${API}/admin/pending-approvals`),
+      ]);
+      const onbData = onbRes.data || [];
+      const trainerIdsInOnboarding = new Set(
+        onbData.map((o) => o.trainer_id).filter(Boolean),
+      );
+      const legacy = (pendRes.data?.trainers || []).filter(
+        (t) => t.trainer_id && !trainerIdsInOnboarding.has(t.trainer_id),
+      );
+      setOnboardingPending(onbData);
+      setLegacyPendingTrainers(legacy);
     } catch (error) {
-      console.error('Error fetching onboarding queue:', error);
+      console.error('Error fetching review queues:', error);
     }
   }, []);
 
@@ -75,16 +88,26 @@ const AdminDashboard = () => {
       return;
     }
     fetchDashboard();
-    fetchOnboarding();
+    fetchReviewQueues();
     fetchCityStats();
     fetchPromos();
-  }, [user, navigate, fetchDashboard, fetchOnboarding, fetchCityStats, fetchPromos]);
+  }, [user, navigate, fetchDashboard, fetchReviewQueues, fetchCityStats, fetchPromos]);
 
   const refreshAll = () => {
     fetchDashboard();
-    fetchOnboarding();
+    fetchReviewQueues();
     fetchCityStats();
     fetchPromos();
+  };
+
+  const approveLegacyTrainer = async (trainerId) => {
+    try {
+      await axios.post(`${API}/admin/approve/trainer/${trainerId}`, {});
+      toast.success('Trainer approved');
+      refreshAll();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Approve failed');
+    }
   };
 
   const openDecision = (action, onboardingId) => {
@@ -267,7 +290,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="onboarding" className="w-full">
           <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="onboarding" data-testid="onboarding-tab">
-              Onboarding ({onboardingPending.length})
+              Onboarding ({onboardingPending.length + legacyPendingTrainers.length})
             </TabsTrigger>
             <TabsTrigger value="cities" data-testid="stats-tab">
               City statistics
@@ -277,63 +300,118 @@ const AdminDashboard = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="onboarding" className="mt-6">
-            {onboardingPending.length === 0 ? (
-              <Card className="border-zinc-200">
-                <CardContent className="p-12 text-center">
-                  <p className="text-zinc-600">No trainer applications awaiting review.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {onboardingPending.map((o) => {
-                  const s = summarizeProfile(o);
-                  return (
-                    <Card key={o.onboarding_id} className="border-zinc-200">
+          <TabsContent value="onboarding" className="mt-6 space-y-10">
+            {onboardingPending.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Submitted onboarding applications</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {onboardingPending.map((o) => {
+                    const s = summarizeProfile(o);
+                    return (
+                      <Card key={o.onboarding_id} className="border-zinc-200">
+                        <CardHeader>
+                          <CardTitle className="text-lg">{s.title}</CardTitle>
+                          <p className="text-xs text-zinc-500 font-mono">{o.onboarding_id}</p>
+                          {o.status ? (
+                            <p className="text-xs text-zinc-500">
+                              Status: <span className="font-mono">{o.status}</span>
+                            </p>
+                          ) : null}
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {s.lines.map((line, i) => (
+                            <p key={i} className="text-sm text-zinc-600">
+                              {line}
+                            </p>
+                          ))}
+                          <p className="text-xs text-zinc-500">
+                            Submitted: {o.submitted_at ? new Date(o.submitted_at).toLocaleString() : '—'}
+                          </p>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => openDecision('approve', o.onboarding_id)}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openDecision('rework', o.onboarding_id)}
+                            >
+                              <RotateCcw className="w-4 h-4 mr-1" />
+                              Request rework
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => openDecision('reject', o.onboarding_id)}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {legacyPendingTrainers.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-2">Trainer profiles pending (no onboarding queue row)</h2>
+                <p className="text-sm text-zinc-500 mb-4 max-w-2xl">
+                  These accounts have a trainer profile waiting for approval but are not linked to a submitted
+                  onboarding application in review. Approve here to activate them, or ask the trainer to complete the
+                  onboarding flow if you need full KYC data.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {legacyPendingTrainers.map((t) => (
+                    <Card key={t.trainer_id} className="border-zinc-200 border-amber-200 bg-amber-50/30">
                       <CardHeader>
-                        <CardTitle className="text-lg">{s.title}</CardTitle>
-                        <p className="text-xs text-zinc-500 font-mono">{o.onboarding_id}</p>
+                        <CardTitle className="text-lg">{t.specialty || 'Trainer'} · legacy profile</CardTitle>
+                        <p className="text-xs text-zinc-500 font-mono">{t.trainer_id}</p>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        {s.lines.map((line, i) => (
-                          <p key={i} className="text-sm text-zinc-600">
-                            {line}
-                          </p>
-                        ))}
-                        <p className="text-xs text-zinc-500">
-                          Submitted: {o.submitted_at ? new Date(o.submitted_at).toLocaleString() : '—'}
+                        <p className="text-sm text-zinc-600">
+                          <strong>Location:</strong> {t.area}, {t.city}
                         </p>
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700"
-                            onClick={() => openDecision('approve', o.onboarding_id)}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openDecision('rework', o.onboarding_id)}
-                          >
-                            <RotateCcw className="w-4 h-4 mr-1" />
-                            Request rework
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => openDecision('reject', o.onboarding_id)}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
+                        <p className="text-sm text-zinc-600">
+                          <strong>Rate:</strong> ₹{t.hourly_rate}/hour
+                        </p>
+                        {t.bio ? (
+                          <p className="text-sm text-zinc-600 line-clamp-3">{t.bio}</p>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 w-full"
+                          onClick={() => approveLegacyTrainer(t.trainer_id)}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Approve trainer
+                        </Button>
                       </CardContent>
                     </Card>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+            )}
+
+            {onboardingPending.length === 0 && legacyPendingTrainers.length === 0 && (
+              <Card className="border-zinc-200">
+                <CardContent className="p-12 text-center space-y-2">
+                  <p className="text-zinc-600">Nothing in the review queue right now.</p>
+                  <p className="text-sm text-zinc-500 max-w-lg mx-auto">
+                    Onboarding submissions with status <span className="font-mono text-xs">under_review</span> appear
+                    under &quot;Submitted onboarding&quot;. Trainers who created a profile without that flow appear under
+                    &quot;Trainer profiles pending&quot;.
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 

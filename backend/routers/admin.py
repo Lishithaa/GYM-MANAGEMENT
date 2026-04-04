@@ -49,7 +49,12 @@ async def admin_dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(
     pending_onboarding = (
         await db.execute(
             select(func.count(TrainerOnboarding.id)).where(
-                TrainerOnboarding.status == TrainerOnboardingStatusEnum.UNDER_REVIEW
+                TrainerOnboarding.status.in_(
+                    (
+                        TrainerOnboardingStatusEnum.UNDER_REVIEW,
+                        TrainerOnboardingStatusEnum.SUBMITTED,
+                    )
+                )
             )
         )
     ).scalar() or 0
@@ -228,6 +233,7 @@ async def approve_legacy(item_type: str, item_id: str, db: AsyncSession = Depend
         return {"message": "Gym approvals are not used in the MySQL app (no gyms table)."}
     if item_type == "trainer":
         await trainer_service.approve_trainer(db, item_id)
+        await trainer_onboarding_service.approve_onboarding_for_trainer_if_pending(db, item_id)
         return {"message": "Approved successfully"}
     raise HTTPException(400, "Invalid item type")
 
