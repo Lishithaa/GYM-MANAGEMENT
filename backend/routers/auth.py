@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -8,12 +8,19 @@ from config import settings
 from database import get_db
 from dependencies import get_current_user
 from models.tables import User
-from schemas.auth import LoginOut, TokenRefreshIn, UserMeOut, UserOut, UserRegisterIn, UserLoginIn
+from schemas.auth import LoginOut, TokenRefreshIn, UserMeOut, UserOut, UserProfilePatch, UserRegisterIn, UserLoginIn
 from services import auth_service
 from services.email_service import send_verification_email
 from utils.jwt_utils import decode_token, create_verify_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+async def _user_me_response(db: AsyncSession, user: User) -> UserMeOut:
+    await auth_service.ensure_referral_code(db, user)
+    referrals_count = await auth_service.count_referrals(db, user.user_id)
+    base = UserOut.model_validate(user)
+    return UserMeOut(**base.model_dump(), referrals_count=referrals_count)
 
 
 class ResendIn(BaseModel):
@@ -119,7 +126,25 @@ async def me(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await auth_service.ensure_referral_code(db, current_user)
-    referrals_count = await auth_service.count_referrals(db, current_user.user_id)
-    base = UserOut.model_validate(current_user)
-    return UserMeOut(**base.model_dump(), referrals_count=referrals_count)
+    return await _user_me_response(db, current_user)
+
+
+@router.patch("/me", response_model=UserMeOut)
+async def patch_me(
+    body: UserProfilePatch,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    u = await auth_service.update_user_profile(db, current_user.user_id, body)
+    return await _user_me_response(db, u)
+
+
+@router.post("/me/photo", response_model=UserMeOut)
+async def upload_me_photo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    raw = await file.read()
+    u = await auth_service.save_user_profile_photo(db, current_user.user_id, raw, file.content_type)
+    return await _user_me_response(db, u)

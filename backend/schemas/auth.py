@@ -37,6 +37,12 @@ class UserMeOut(UserOut):
     referrals_count: int = 0
 
 
+class UserProfilePatch(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    picture: Optional[str] = None
+
+
 class AdminUserCreateIn(BaseModel):
     email: str
     password: str

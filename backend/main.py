@@ -79,4 +79,5 @@ app.include_router(platform.router)
 _uploads_root = Path(__file__).resolve().parent / "uploads"
 _uploads_root.mkdir(exist_ok=True)
 (_uploads_root / "trainers").mkdir(exist_ok=True)
+(_uploads_root / "users").mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(_uploads_root)), name="uploads")

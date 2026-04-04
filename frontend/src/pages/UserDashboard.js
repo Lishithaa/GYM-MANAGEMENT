@@ -1,22 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dumbbell, Calendar, LogOut, Star, Gift, MessageSquareWarning } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Dumbbell, Calendar, LogOut, Star, Gift, MessageSquareWarning, Pencil, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
+
+const USER_AVATAR_FALLBACK =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="36" r="16" fill="#a1a1aa"/><path d="M24 78c4-16 44-16 48 0" fill="#a1a1aa"/></svg>'
+  );
 
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { user, logout, checkAuth } = useAuth();
+  const profilePhotoInputRef = useRef(null);
   const [bookings, setBookings] = useState([]);
   const [showReview, setShowReview] = useState(false);
   const [reviewData, setReviewData] = useState({
@@ -31,6 +45,10 @@ const UserDashboard = () => {
     subject: '',
     body: ''
   });
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [userProfileForm, setUserProfileForm] = useState({ name: '', phone: '', picture: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const fetchMyComplaints = useCallback(async () => {
     try {
@@ -79,6 +97,71 @@ const UserDashboard = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/', { replace: true });
+  };
+
+  const openProfileEdit = () => {
+    if (!user) return;
+    setUserProfileForm({
+      name: user.name || '',
+      phone: user.phone || '',
+      picture: user.picture || ''
+    });
+    setShowProfileEdit(true);
+  };
+
+  const onProfilePhotoDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const onProfilePhotoDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadUserProfilePhoto(file);
+  };
+
+  const uploadUserProfilePhoto = async (file) => {
+    if (!file || !file.type.startsWith('image/')) {
+      toast.error('Choose an image file (JPEG, PNG, WebP, or GIF)');
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await axios.post(`${API}/auth/me/photo`, fd);
+      setUserProfileForm((f) => ({ ...f, picture: data.picture || '' }));
+      await checkAuth();
+      toast.success('Profile photo updated');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Upload failed'));
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const saveUserProfile = async (e) => {
+    e.preventDefault();
+    if (!userProfileForm.name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      await axios.patch(`${API}/auth/me`, {
+        name: userProfileForm.name.trim(),
+        phone: userProfileForm.phone.trim() || null,
+        picture: userProfileForm.picture.trim() || null
+      });
+      await checkAuth();
+      toast.success('Profile saved');
+      setShowProfileEdit(false);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Could not save profile'));
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const copyReferralLink = () => {
@@ -172,17 +255,36 @@ const UserDashboard = () => {
             <span className="text-2xl font-bold font-['Outfit'] tracking-tight">HourlyGym</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <img
-                src={user?.picture || 'https://via.placeholder.com/40'}
-                alt={user?.name}
-                className="w-10 h-10 rounded-full border-2 border-zinc-200"
-              />
-              <div>
-                <p className="font-bold text-sm">{user?.name}</p>
-                <p className="text-xs text-zinc-600">{user?.email}</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 -ml-2 text-left outline-none transition-colors hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  data-testid="user-menu-trigger"
+                  aria-label="Account menu"
+                >
+                  <img
+                    src={user?.picture || USER_AVATAR_FALLBACK}
+                    alt=""
+                    className="w-10 h-10 rounded-full border-2 border-zinc-200 object-cover bg-zinc-100 pointer-events-none"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = USER_AVATAR_FALLBACK;
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm truncate">{user?.name}</p>
+                    <p className="text-xs text-zinc-600 truncate max-w-[200px] sm:max-w-[240px]">{user?.email}</p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={openProfileEdit} data-testid="edit-profile-button">
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit profile
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               onClick={handleLogout}
               variant="outline"
@@ -426,6 +528,87 @@ const UserDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={showProfileEdit} onOpenChange={setShowProfileEdit}>
+        <DialogContent className="max-h-[90vh] flex flex-col" aria-describedby="user-profile-edit-desc">
+          <DialogHeader>
+            <DialogTitle>Edit profile</DialogTitle>
+          </DialogHeader>
+          <p id="user-profile-edit-desc" className="sr-only">
+            Update your name, phone, profile photo, or picture URL
+          </p>
+          <form onSubmit={saveUserProfile} className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
+            <div>
+              <Label>Profile photo</Label>
+              <input
+                ref={profilePhotoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(ev) => {
+                  const f = ev.target.files?.[0];
+                  if (f) uploadUserProfilePhoto(f);
+                  ev.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onDragOver={onProfilePhotoDragOver}
+                onDrop={onProfilePhotoDrop}
+                onClick={() => profilePhotoInputRef.current?.click()}
+                disabled={photoUploading}
+                className="mt-1 w-full rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50/80 px-4 py-6 text-center text-sm text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-100 disabled:opacity-50"
+              >
+                <Upload className="w-7 h-7 mx-auto mb-2 text-zinc-400" />
+                <span className="font-medium text-zinc-800">
+                  {photoUploading ? 'Uploading…' : 'Drop a photo here or click to browse'}
+                </span>
+                <span className="block text-xs text-zinc-500 mt-1">JPEG, PNG, WebP or GIF · max 5MB</span>
+              </button>
+            </div>
+            <div>
+              <Label htmlFor="user-picture-url">Or picture URL (optional)</Label>
+              <Input
+                id="user-picture-url"
+                value={userProfileForm.picture}
+                onChange={(e) => setUserProfileForm({ ...userProfileForm, picture: e.target.value })}
+                placeholder="https://…"
+              />
+            </div>
+            <div>
+              <Label htmlFor="user-edit-name">Name</Label>
+              <Input
+                id="user-edit-name"
+                value={userProfileForm.name}
+                onChange={(e) => setUserProfileForm({ ...userProfileForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="user-edit-phone">Phone (optional)</Label>
+              <Input
+                id="user-edit-phone"
+                value={userProfileForm.phone}
+                onChange={(e) => setUserProfileForm({ ...userProfileForm, phone: e.target.value })}
+                placeholder="+91…"
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input value={user?.email || ''} disabled className="bg-zinc-50 text-zinc-500" readOnly />
+              <p className="text-xs text-zinc-500 mt-1">Email cannot be changed here.</p>
+            </div>
+            <DialogFooter className="gap-2 sm:justify-end pt-2 border-t border-zinc-200">
+              <Button type="button" variant="outline" onClick={() => setShowProfileEdit(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-black text-white hover:bg-zinc-800" disabled={profileSaving}>
+                {profileSaving ? 'Saving…' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showReview} onOpenChange={setShowReview}>
         <DialogContent data-testid="review-dialog" aria-describedby="review-dialog-description">

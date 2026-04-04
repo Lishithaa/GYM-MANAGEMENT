@@ -1,5 +1,7 @@
 import secrets
+import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -7,8 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from models.tables import User, RefreshToken, UserRoleEnum
+from schemas.auth import UserProfilePatch
 from utils.security import hash_password, verify_password
 from utils.jwt_utils import create_access_token, create_refresh_token, create_verify_token
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+USER_PHOTO_DIR = _BACKEND_ROOT / "uploads" / "users"
+USER_PHOTO_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+MAX_USER_PHOTO_BYTES = 5 * 1024 * 1024
 
 
 async def _unique_referral_code(db: AsyncSession) -> str:
@@ -138,6 +152,41 @@ async def revoke_refresh_token(db: AsyncSession, refresh_token: str) -> None:
     rt = result.scalar_one_or_none()
     if rt:
         await db.delete(rt)
+
+
+async def update_user_profile(db: AsyncSession, user_id: str, data: UserProfilePatch) -> User:
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    updates = data.model_dump(exclude_unset=True)
+    if not updates:
+        return user
+    for key, value in updates.items():
+        setattr(user, key, value)
+    await db.flush()
+    return user
+
+
+async def save_user_profile_photo(db: AsyncSession, user_id: str, raw: bytes, content_type: str | None) -> User:
+    ct = (content_type or "").split(";")[0].strip().lower()
+    if ct not in USER_PHOTO_TYPES:
+        raise HTTPException(400, "File must be JPEG, PNG, WebP, or GIF")
+    if len(raw) > MAX_USER_PHOTO_BYTES:
+        raise HTTPException(413, "Image must be 5MB or smaller")
+    USER_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    ext = USER_PHOTO_TYPES[ct]
+    name = f"{uuid.uuid4().hex}{ext}"
+    path = USER_PHOTO_DIR / name
+    path.write_bytes(raw)
+    public_url = f"{settings.PUBLIC_BACKEND_URL.rstrip('/')}/uploads/users/{name}"
+    result = await db.execute(select(User).where(User.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    user.picture = public_url
+    await db.flush()
+    return user
 
 
 async def admin_create_user(
