@@ -3,7 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CityPicker } from '@/components/CityPicker';
+import { AreaPicker } from '@/components/AreaPicker';
+import { parseCitiesResponse } from '@/utils/parseCitiesResponse';
 import { Dumbbell, MapPin, Star, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { API } from '@/config';
@@ -14,6 +16,7 @@ const Gyms = () => {
   const { user } = useAuth();
   const [gyms, setGyms] = useState([]);
   const [cities, setCities] = useState([]);
+  const [popularCities, setPopularCities] = useState([]);
   const [areas, setAreas] = useState([]);
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
@@ -22,7 +25,9 @@ const Gyms = () => {
   const fetchCities = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/cities`);
-      setCities(response.data.cities);
+      const { cities: list, popular } = parseCitiesResponse(response.data);
+      setCities(list);
+      setPopularCities(popular);
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
@@ -30,8 +35,9 @@ const Gyms = () => {
 
   const fetchAreas = useCallback(async (city) => {
     try {
-      const response = await axios.get(`${API}/areas/${city}`);
-      setAreas(response.data.areas);
+      const response = await axios.get(`${API}/areas/${encodeURIComponent(city)}`);
+      const raw = response.data;
+      setAreas(Array.isArray(raw?.areas) ? raw.areas : Array.isArray(raw) ? raw : []);
     } catch (error) {
       console.error('Error fetching areas:', error);
     }
@@ -129,35 +135,31 @@ const Gyms = () => {
           </p>
         </div>
 
-        <div className="flex gap-4 mb-8">
-          <Select value={selectedCity} onValueChange={setSelectedCity}>
-            <SelectTrigger className="w-[200px]" data-testid="city-select">
-              <SelectValue placeholder="Select City" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all">All Cities</SelectItem>
-              {cities.map((city) => (
-                <SelectItem key={city} value={city}>
-                  {city}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap gap-4 mb-8">
+          <CityPicker
+            value={selectedCity && selectedCity !== '_all' ? selectedCity : ''}
+            onChange={(v) => setSelectedCity(v === '_all' ? '_all' : v)}
+            cities={cities}
+            popular={popularCities}
+            topChoices={[{ value: '_all', label: 'All cities' }]}
+            emptySelectionLabel="All cities"
+            placeholder="Select city"
+            triggerClassName="w-[220px]"
+            data-testid="city-select"
+          />
 
           {selectedCity && selectedCity !== '_all' && (
-            <Select value={selectedArea} onValueChange={setSelectedArea}>
-              <SelectTrigger className="w-[200px]" data-testid="area-select">
-                <SelectValue placeholder="Select Area" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_all">All Areas</SelectItem>
-                {areas.map((area) => (
-                  <SelectItem key={area} value={area}>
-                    {area}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-[220px]">
+              <p className="text-xs text-zinc-500 mb-1.5">Area (optional)</p>
+              <AreaPicker
+                id="gyms-browse-area"
+                value={selectedArea === '_all' ? '' : selectedArea}
+                onChange={(v) => setSelectedArea(v.trim() ? v : '_all')}
+                areas={areas}
+                placeholder="All areas — type to narrow"
+                data-testid="area-select"
+              />
+            </div>
           )}
         </div>
 

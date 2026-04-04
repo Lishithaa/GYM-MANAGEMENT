@@ -11,20 +11,182 @@ from services import booking_service, trainer_service
 router = APIRouter(tags=["misc"])
 
 CITIES_AREAS = {
-    "Hyderabad": ["Banjara Hills", "Jubilee Hills", "Hitech City", "Gachibowli", "Kukatpally", "Madhapur"],
-    "Bangalore": ["Koramangala", "Indiranagar", "Whitefield", "HSR Layout", "Electronic City", "Jayanagar"],
-    "Guntur": ["Brodipet", "Lakshmipuram", "Arundelpet", "Nallapadu", "Pattabhipuram"],
+    "Hyderabad": sorted(
+        {
+            "Ameerpet",
+            "Banjara Hills",
+            "Begumpet",
+            "Chandanagar",
+            "Charminar / Old City",
+            "Dilsukhnagar",
+            "Film Nagar",
+            "Financial District",
+            "Gachibowli",
+            "Hitech City",
+            "Jubilee Hills",
+            "Kokapet",
+            "Kompally",
+            "Kondapur",
+            "Kukatpally",
+            "LB Nagar",
+            "Madhapur",
+            "Manikonda",
+            "Mehdipatnam",
+            "Miyapur",
+            "Nagole",
+            "Nanakramguda",
+            "Nallagandla",
+            "Secunderabad",
+            "Serilingampally",
+            "Shamshabad",
+            "Shamirpet",
+            "Somajiguda",
+            "SR Nagar",
+            "Tolichowki",
+            "Uppal",
+            "Vanasthalipuram",
+            "Yousufguda",
+        }
+    ),
+    "Bangalore": sorted(
+        {
+            "Bellandur",
+            "BTM Layout",
+            "Electronic City",
+            "HSR Layout",
+            "Indiranagar",
+            "Jayanagar",
+            "JP Nagar",
+            "Koramangala",
+            "Marathahalli",
+            "MG Road / Ulsoor",
+            "Rajajinagar",
+            "Whitefield",
+            "Yelahanka",
+        }
+    ),
+    "Guntur": sorted(
+        {
+            "Arundelpet",
+            "Brodipet",
+            "Lakshmipuram",
+            "Nallapadu",
+            "Pattabhipuram",
+            "Pedakakani",
+            "Phoenix Mall area",
+            "Reddy Bazar",
+        }
+    ),
+    "Mumbai": sorted(
+        {
+            "Andheri",
+            "Bandra",
+            "Borivali",
+            "Chembur",
+            "Colaba",
+            "Goregaon",
+            "Juhu",
+            "Lower Parel",
+            "Navi Mumbai",
+            "Powai",
+            "Thane",
+            "Worli",
+        }
+    ),
+    "Chennai": sorted(
+        {
+            "Adyar",
+            "Anna Nagar",
+            "OMR",
+            "Porur",
+            "T Nagar",
+            "Tambaram",
+            "Velachery",
+        }
+    ),
+    "Pune": sorted(
+        {
+            "Baner",
+            "Hinjewadi",
+            "Kharadi",
+            "Kondhwa",
+            "Koregaon Park",
+            "Kothrud",
+            "Viman Nagar",
+            "Wakad",
+        }
+    ),
+    "Delhi NCR": sorted(
+        {
+            "Connaught Place",
+            "Dwarka",
+            "Ghaziabad",
+            "Golf Course Road (Gurgaon)",
+            "Greater Noida",
+            "Gurgaon",
+            "Noida",
+            "South Delhi",
+            "Vasant Kunj",
+        }
+    ),
+    "Kolkata": sorted(
+        {
+            "Alipore",
+            "Howrah",
+            "New Town",
+            "Park Street",
+            "Salt Lake",
+            "South Kolkata",
+        }
+    ),
+    "Ahmedabad": sorted(
+        {
+            "Maninagar",
+            "Navrangpura",
+            "Satellite",
+            "SG Highway",
+            "Vastrapur",
+        }
+    ),
 }
+
+# Order shown under "Popular cities" in the UI (reference: tier-1 metros + existing regions).
+POPULAR_CITY_ORDER = [
+    "Bangalore",
+    "Delhi NCR",
+    "Hyderabad",
+    "Mumbai",
+    "Chennai",
+    "Pune",
+    "Guntur",
+    "Kolkata",
+    "Ahmedabad",
+]
+
+
+def _areas_for_city(city: str) -> list[str]:
+    if not city or not city.strip():
+        return []
+    key = city.strip()
+    if key in CITIES_AREAS:
+        return list(CITIES_AREAS[key])
+    lowered = key.lower()
+    for name, areas in CITIES_AREAS.items():
+        if name.lower() == lowered:
+            return list(areas)
+    return []
 
 
 @router.get("/api/cities")
 async def cities():
-    return list(CITIES_AREAS.keys())
+    all_cities = sorted(CITIES_AREAS.keys())
+    popular = [c for c in POPULAR_CITY_ORDER if c in CITIES_AREAS]
+    return {"cities": all_cities, "popular": popular}
 
 
 @router.get("/api/areas/{city}")
 async def areas(city: str):
-    return CITIES_AREAS.get(city, [])
+    return {"areas": _areas_for_city(city)}
 
 
 @router.get("/api/gyms")

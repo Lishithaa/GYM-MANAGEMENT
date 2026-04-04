@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import { API } from '@/config';
 import { goBack } from '@/utils/goBack';
 import { TrainerShowcaseCard } from '@/components/TrainerShowcaseCard';
+import { CityPicker } from '@/components/CityPicker';
+import { AreaPicker } from '@/components/AreaPicker';
+import { parseCitiesResponse } from '@/utils/parseCitiesResponse';
 
 const WHAT_YOU_TEACH_OPTIONS = [
   'Fat Loss',
@@ -49,6 +52,7 @@ const TrainerDashboard = () => {
   const [onboardingId, setOnboardingId] = useState(null);
   const [onboardingPage, setOnboardingPage] = useState(1);
   const [cities, setCities] = useState([]);
+  const [popularCities, setPopularCities] = useState([]);
   const [areas, setAreas] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   /** From GET /trainers/me/verification-status — distinguishes submitted onboarding vs generic pending */
@@ -143,7 +147,9 @@ const TrainerDashboard = () => {
   const fetchCities = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/cities`);
-      setCities(response.data || []);
+      const { cities: list, popular } = parseCitiesResponse(response.data);
+      setCities(list);
+      setPopularCities(popular);
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
@@ -152,8 +158,10 @@ const TrainerDashboard = () => {
   const fetchAreas = useCallback(async (city) => {
     if (!city) return;
     try {
-      const response = await axios.get(`${API}/areas/${city}`);
-      setAreas(response.data || []);
+      const response = await axios.get(`${API}/areas/${encodeURIComponent(city)}`);
+      const raw = response.data;
+      const list = Array.isArray(raw?.areas) ? raw.areas : Array.isArray(raw) ? raw : [];
+      setAreas(list);
     } catch (error) {
       console.error('Error fetching areas:', error);
       setAreas([]);
@@ -1121,43 +1129,30 @@ const TrainerDashboard = () => {
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>City</Label>
-                <Select
-                  value={profileEditForm.city || undefined}
-                  onValueChange={(val) => {
+                <Label htmlFor="edit-profile-city">City</Label>
+                <CityPicker
+                  id="edit-profile-city"
+                  value={profileEditForm.city}
+                  onChange={(val) => {
                     setProfileEditForm({ ...profileEditForm, city: val, area: '' });
                     fetchAreas(val);
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select city" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cities.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  cities={cities}
+                  popular={popularCities}
+                  placeholder="Select city"
+                  data-testid="edit-profile-city-picker"
+                />
               </div>
               <div>
-                <Label>Area</Label>
-                <Select
-                  value={profileEditForm.area || undefined}
-                  onValueChange={(val) => setProfileEditForm({ ...profileEditForm, area: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select area" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map((area) => (
-                      <SelectItem key={area} value={area}>
-                        {area}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="edit-profile-area">Area</Label>
+                <AreaPicker
+                  id="edit-profile-area"
+                  value={profileEditForm.area}
+                  onChange={(val) => setProfileEditForm({ ...profileEditForm, area: val })}
+                  areas={areas}
+                  placeholder={areas.length ? 'Choose or type your area' : 'Type your area / locality'}
+                  data-testid="edit-profile-area-input"
+                />
               </div>
             </div>
             <div>
@@ -1393,43 +1388,30 @@ const TrainerDashboard = () => {
             <form onSubmit={handleOnboardingNext} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>City</Label>
-                  <Select
+                  <Label htmlFor="onboarding-city">City</Label>
+                  <CityPicker
+                    id="onboarding-city"
                     value={profileForm.city}
-                    onValueChange={(val) => {
+                    onChange={(val) => {
                       setProfileForm({ ...profileForm, city: val, area: '' });
                       fetchAreas(val);
                     }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select city" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cities.map((city) => (
-                        <SelectItem key={city} value={city}>
-                          {city}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    cities={cities}
+                    popular={popularCities}
+                    placeholder="Select city"
+                    data-testid="onboarding-city-picker"
+                  />
                 </div>
                 <div>
-                  <Label>Area</Label>
-                  <Select
+                  <Label htmlFor="onboarding-area">Area</Label>
+                  <AreaPicker
+                    id="onboarding-area"
                     value={profileForm.area}
-                    onValueChange={(val) => setProfileForm({ ...profileForm, area: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select area" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {areas.map((area) => (
-                        <SelectItem key={area} value={area}>
-                          {area}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(val) => setProfileForm({ ...profileForm, area: val })}
+                    areas={areas}
+                    placeholder={areas.length ? 'Choose or type your area' : 'Type your area / locality'}
+                    data-testid="onboarding-area-input"
+                  />
                 </div>
               </div>
 

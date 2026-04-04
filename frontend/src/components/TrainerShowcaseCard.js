@@ -85,7 +85,7 @@ export function TrainerShowcaseCard({
       tabIndex={onClick ? 0 : undefined}
       data-testid={testId}
       className={cn(
-        'rounded-3xl overflow-hidden bg-[#3d565e] text-white shadow-xl ring-1 ring-black/15 text-left w-full',
+        'rounded-3xl overflow-hidden bg-[#3d565e] text-white shadow-xl ring-1 ring-zinc-400/30 text-left w-full',
         variant === 'hero' && 'max-w-xl',
         onClick && 'cursor-pointer hover:brightness-[1.03] transition-[filter,box-shadow]',
         className
@@ -110,7 +110,7 @@ export function TrainerShowcaseCard({
         </div>
       </div>
       <div className="flex flex-col items-center gap-2 px-4 pb-5 pt-0 -mt-12 relative z-10">
-        <span className="rounded-full bg-black px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold tracking-[0.2em] text-white shadow-lg">
+        <span className="rounded-full bg-white/20 backdrop-blur-sm border border-white/35 px-4 py-2.5 text-[10px] sm:text-[11px] font-semibold tracking-[0.2em] text-white shadow-lg">
           {badge}
         </span>
         {trainer.hourly_rate != null && variant !== 'hero' && (

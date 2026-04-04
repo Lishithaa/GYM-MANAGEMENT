@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/PasswordInput';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -90,9 +91,8 @@ const Login = () => {
 
             <div>
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
@@ -112,7 +112,14 @@ const Login = () => {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500 font-['Manrope'] mt-6">
+          <p className="text-center text-sm text-zinc-600 mt-6">
+            Don&apos;t have an account?{' '}
+            <Link to="/register" className="text-blue-600 font-medium hover:underline" data-testid="login-register-link">
+              Create account
+            </Link>
+          </p>
+
+          <p className="text-center text-sm text-zinc-500 font-['Manrope'] mt-4">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
         </CardContent>

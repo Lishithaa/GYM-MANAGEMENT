@@ -7,6 +7,7 @@ import AuthCallback from '@/pages/AuthCallback';
 import RoleSelection from '@/pages/RoleSelection';
 import Landing from '@/pages/Landing';
 import Login from '@/pages/Login';
+import Register from '@/pages/Register';
 import Gyms from '@/pages/Gyms';
 import GymDetail from '@/pages/GymDetail';
 import Trainers from '@/pages/Trainers';
@@ -35,6 +36,7 @@ function AppRouter() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/role-selection" element={<RoleSelection />} />
       <Route path="/gyms" element={<Gyms />} />
       <Route path="/gyms/:id" element={<GymDetail />} />

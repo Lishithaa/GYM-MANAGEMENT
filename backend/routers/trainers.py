@@ -8,7 +8,7 @@ from models.tables import User
 from schemas.platform import TrainerLocationPatch
 from schemas.trainer import TrainerIn, TrainerOut, TrainerProfilePatch
 from schemas.trainer_onboarding import OnboardingStartOut, OnboardingStepPatchIn, TrainerOnboardingOut
-from services import audit_service, trainer_onboarding_service, trainer_service
+from services import audit_service, review_service, trainer_onboarding_service, trainer_service
 
 router = APIRouter(prefix="/api/trainers", tags=["trainers"])
 
@@ -174,5 +174,7 @@ async def get_availability(trainer_id: str, date: str, db: AsyncSession = Depend
 @router.get("/{trainer_id}", response_model=TrainerOut)
 async def get_trainer(trainer_id: str, db: AsyncSession = Depends(get_db)):
     t = await trainer_service.get_public_trainer_by_id(db, trainer_id)
+    await review_service.sync_trainer_review_stats(db, t.trainer_id)
+    await db.refresh(t)
     names = await trainer_service.user_names_by_user_ids(db, [t.user_id])
     return trainer_service.to_trainer_out(t, names.get(t.user_id))

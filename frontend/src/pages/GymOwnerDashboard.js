@@ -14,6 +14,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
 import { TrainerShowcaseCard } from '@/components/TrainerShowcaseCard';
+import { CityPicker } from '@/components/CityPicker';
+import { AreaPicker } from '@/components/AreaPicker';
+import { parseCitiesResponse } from '@/utils/parseCitiesResponse';
 
 const GymOwnerDashboard = () => {
   const navigate = useNavigate();
@@ -24,6 +27,7 @@ const GymOwnerDashboard = () => {
   const [earnings, setEarnings] = useState({ total: 0, monthly: 0 });
   const [showGymForm, setShowGymForm] = useState(false);
   const [cities, setCities] = useState([]);
+  const [popularCities, setPopularCities] = useState([]);
   const [areas, setAreas] = useState([]);
   const [gymForm, setGymForm] = useState({
     name: '',
@@ -38,7 +42,9 @@ const GymOwnerDashboard = () => {
   const fetchCities = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/cities`);
-      setCities(response.data.cities);
+      const { cities: list, popular } = parseCitiesResponse(response.data);
+      setCities(list);
+      setPopularCities(popular);
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
@@ -46,8 +52,9 @@ const GymOwnerDashboard = () => {
 
   const fetchAreas = async (city) => {
     try {
-      const response = await axios.get(`${API}/areas/${city}`);
-      setAreas(response.data.areas);
+      const response = await axios.get(`${API}/areas/${encodeURIComponent(city)}`);
+      const raw = response.data;
+      setAreas(Array.isArray(raw?.areas) ? raw.areas : Array.isArray(raw) ? raw : []);
     } catch (error) {
       console.error('Error fetching areas:', error);
     }
@@ -348,43 +355,30 @@ const GymOwnerDashboard = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>City</Label>
-                <Select
+                <Label htmlFor="gym-form-city">City</Label>
+                <CityPicker
+                  id="gym-form-city"
                   value={gymForm.city}
-                  onValueChange={(val) => {
-                    setGymForm({ ...gymForm, city: val });
+                  onChange={(val) => {
+                    setGymForm({ ...gymForm, city: val, area: '' });
                     fetchAreas(val);
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select city" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cities.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  cities={cities}
+                  popular={popularCities}
+                  placeholder="Select city"
+                  data-testid="gym-owner-city-picker"
+                />
               </div>
               <div>
-                <Label>Area</Label>
-                <Select
+                <Label htmlFor="gym-form-area">Area</Label>
+                <AreaPicker
+                  id="gym-form-area"
                   value={gymForm.area}
-                  onValueChange={(val) => setGymForm({ ...gymForm, area: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select area" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map((area) => (
-                      <SelectItem key={area} value={area}>
-                        {area}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(val) => setGymForm({ ...gymForm, area: val })}
+                  areas={areas}
+                  placeholder={areas.length ? 'Choose or type your area' : 'Type your area / locality'}
+                  data-testid="gym-owner-area-input"
+                />
               </div>
             </div>
             <div>

@@ -44,11 +44,16 @@ const TrainerDetail = () => {
   }, [id]);
 
   const fetchReviews = useCallback(async () => {
+    if (!id) return;
     try {
-      const response = await axios.get(`${API}/reviews/trainer/${id}`);
-      setReviews(response.data);
+      const { data } = await axios.get(`${API}/reviews`, {
+        params: { target_type: 'trainer', target_id: id },
+      });
+      setReviews(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      toast.error('Could not load reviews');
+      setReviews([]);
     }
   }, [id]);
 
