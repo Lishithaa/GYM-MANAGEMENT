@@ -1,4 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+#
+# Source layout (not repo root — parent folder may be a wider workspace):
+#   frontend/package.json   — React app
+#   backend/requirements.txt — Python API
+#   (No Dockerfile in tree yet; add one under backend/ or repo root when needed.)
 
 # IDE and editors
 .idea/
@@ -60,6 +65,19 @@ __pycache__/
 *pyc*
 venv/
 .venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+*.egg
+htmlcov/
+.coverage
+coverage.xml
+*.sqlite3
+*.db-journal
+
+# Docker / Compose (local overrides only; commit Dockerfile & docker-compose.yml)
+docker-compose.override.yml
 
 # Development tools
 .emergent/
