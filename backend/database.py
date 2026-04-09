@@ -1,27 +1,23 @@
-import ssl as ssl_lib
 from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
 from config import settings
+from db_url import normalize_async_database_url
 
 
 def _build_engine():
-    # connect_timeout avoids hanging forever when DB is unreachable (VPN, firewall, wrong IP allowlist).
-    connect_args: dict = {"connect_timeout": 15}
+    url, connect_args = normalize_async_database_url(settings.DATABASE_URL)
     kwargs: dict = {
         "pool_pre_ping": True,
         "pool_size": 10,
         "max_overflow": 20,
         "echo": False,
         "pool_timeout": 30,
+        "connect_args": connect_args,
     }
-    if settings.MYSQL_SSL_ENABLED and settings.DATABASE_URL:
-        ctx = ssl_lib.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl_lib.CERT_NONE
-        connect_args["ssl"] = ctx
-    kwargs["connect_args"] = connect_args
-    return create_async_engine(settings.DATABASE_URL, **kwargs)
+    return create_async_engine(url, **kwargs)
 
 
 engine = _build_engine()
