@@ -58,6 +58,17 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 app = FastAPI(title="HourlyGym API", version="2.0.0", lifespan=lifespan)
 
 
+@app.get("/")
+async def root():
+    """Root has no SPA when only the API is deployed; point users to docs and health."""
+    return {
+        "service": "HourlyGym API",
+        "message": "This URL serves the backend. Open your frontend app URL for the UI, or use the links below.",
+        "api_health": "/api/health",
+        "openapi_docs": "/docs",
+    }
+
+
 @app.get("/api/health")
 async def api_health():
     """Health check when ingress routes /api with preserve_path_prefix (DigitalOcean App Platform)."""
