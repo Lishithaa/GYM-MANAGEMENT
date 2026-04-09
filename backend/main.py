@@ -57,6 +57,13 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 app = FastAPI(title="HourlyGym API", version="2.0.0", lifespan=lifespan)
 
+
+@app.get("/api/health")
+async def api_health():
+    """Health check when ingress routes /api with preserve_path_prefix (DigitalOcean App Platform)."""
+    return {"status": "ok"}
+
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
