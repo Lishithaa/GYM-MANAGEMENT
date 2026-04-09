@@ -1,0 +1,34 @@
+DigitalOcean App Platform (GYM-MANAGEMENT monorepo)
+====================================================
+
+Why "No components detected"
+----------------------------
+The wizard looks at the REPO ROOT for package.json, requirements.txt, or Dockerfile.
+This repo had backend/requirements.txt and frontend/package.json only in subfolders.
+
+What was added at the root
+--------------------------
+- requirements.txt          -> includes backend deps via "-r backend/requirements.txt"
+- Dockerfile                -> builds the FastAPI API from backend/ when context is repo root
+- .do/app.yaml              -> optional full spec (API + nginx frontend + ingress)
+
+Deploy options
+--------------
+
+A) Wizard: set "Source directory" to `backend`  -> detects backend/requirements.txt + backend/Dockerfile
+   OR set source to `frontend`                -> detects frontend/package.json + frontend/Dockerfile
+
+B) Use the app spec: create app from `.do/app.yaml` (doctl or UI "App spec" import).
+   - Edit `.do/app.yaml`: set github.repo / branch if yours differ from Lishithaa/GYM-MANAGEMENT / Develop
+   - Set web service REACT_APP_BACKEND_URL (BUILD_TIME) to your public app URL (same origin if using ingress in the spec)
+
+C) Docker only: root Dockerfile builds the API; use source_dir / or Dockerfile path in the component.
+
+Environment variables (backend)
+--------------------------------
+Set in App Platform: DATABASE_URL, JWT_SECRET, CORS_ORIGINS, FRONTEND_URL, PUBLIC_BACKEND_URL,
+SendGrid/Razorpay keys as needed (see backend/.env.example).
+
+Health checks
+-------------
+GET /health and GET /api/health both return {"status":"ok"} for gateways and probes.

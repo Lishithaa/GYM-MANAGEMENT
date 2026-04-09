@@ -1,0 +1,4 @@
+# Monorepo root — DigitalOcean / buildpacks scan this file for Python deps.
+# Explicit pin helps auto-detectors that do not expand "-r"; full list is in backend/requirements.txt.
+fastapi==0.110.1
+-r backend/requirements.txt
