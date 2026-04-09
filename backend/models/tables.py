@@ -31,6 +31,14 @@ class TrainerOnboardingStatusEnum(str, enum.Enum):
     REWORK_REQUIRED = "rework_required"
 
 
+class InvitationStatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    BOOKING_INITIATED = "booking_initiated"
+    CANCELLED = "cancelled"
+
+
 def _now():
     return datetime.now(timezone.utc)
 
@@ -113,6 +121,73 @@ class Trainer(Base):
         if self.rejected:
             return "rejected"
         return "under_review"
+
+
+class Apartment(Base):
+    __tablename__ = "apartments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    apartment_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("apt"))
+    city = Column(String(100), nullable=False, index=True)
+    locality = Column(String(120), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_by_user_id = Column(String(24), ForeignKey("users.user_id"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+
+class TrainerApartment(Base):
+    __tablename__ = "trainer_apartments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trainer_apartment_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("tap"))
+    trainer_id = Column(String(24), ForeignKey("trainers.trainer_id", ondelete="CASCADE"), nullable=False, index=True)
+    apartment_id = Column(
+        String(24), ForeignKey("apartments.apartment_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class TrainerInvitation(Base):
+    __tablename__ = "trainer_invitations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    invitation_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("inv"))
+    user_id = Column(String(24), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    trainer_id = Column(String(24), ForeignKey("trainers.trainer_id", ondelete="CASCADE"), nullable=False, index=True)
+    apartment_id = Column(
+        String(24), ForeignKey("apartments.apartment_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    date = Column(String(20), nullable=False)
+    start_time = Column(String(10), nullable=False)
+    end_time = Column(String(10), nullable=False)
+    workout = Column(String(120), nullable=True)
+    amount = Column(DECIMAL(10, 2), nullable=False, default=0)
+    note = Column(Text, nullable=True)
+    status = Column(SAEnum(InvitationStatusEnum), nullable=False, default=InvitationStatusEnum.PENDING, index=True)
+    responded_at = Column(DateTime, nullable=True)
+    booking_id = Column(String(24), ForeignKey("bookings.booking_id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    updated_at = Column(DateTime, nullable=False, default=_now, onupdate=_now)
+
+
+class UserNotification(Base):
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    notification_id = Column(String(24), unique=True, nullable=False, index=True, default=lambda: _uid("ntf"))
+    user_id = Column(String(24), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(50), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=False)
+    payload = Column(JSON, nullable=True)
+    is_read = Column(Boolean, nullable=False, default=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
 
 
 class TrainerOnboarding(Base):

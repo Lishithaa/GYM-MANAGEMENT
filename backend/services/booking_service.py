@@ -173,7 +173,7 @@ async def cancel_booking(db: AsyncSession, booking_id: str, user_id: str) -> Boo
 async def get_trainer_bookings(db: AsyncSession, trainer_id: str) -> list[Booking]:
     result = await db.execute(
         select(Booking)
-        .where(Booking.target_id == trainer_id, Booking.status != BookingStatusEnum.INITIATED)
+        .where(Booking.target_id == trainer_id)
         .order_by(Booking.created_at.desc())
     )
     return list(result.scalars().all())

@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 
 from config import settings
 from database import AsyncSessionLocal, Base, engine
-from routers import auth, trainers, bookings, reviews, admin, misc, platform
+from routers import auth, trainers, bookings, reviews, admin, misc, platform, locality, postgis
 from services.admin_seed_service import ensure_default_admin
 
 logging.basicConfig(
@@ -75,6 +75,8 @@ app.include_router(reviews.router)
 app.include_router(admin.router)
 app.include_router(misc.router)
 app.include_router(platform.router)
+app.include_router(locality.router)
+app.include_router(postgis.router)
 
 _uploads_root = Path(__file__).resolve().parent / "uploads"
 _uploads_root.mkdir(exist_ok=True)
