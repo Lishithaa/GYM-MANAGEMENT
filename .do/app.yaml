@@ -84,20 +84,20 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       # Same-origin SPA + API (override in UI if you use a custom domain)
       - key: FRONTEND_URL
         value: https://sea-lion-app-gpcie.ondigitalocean.app
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: PUBLIC_BACKEND_URL
         value: https://sea-lion-app-gpcie.ondigitalocean.app
         scope: RUN_TIME
-        type: general
+        type: GENERAL
       - key: CORS_ORIGINS
         value: https://sea-lion-app-gpcie.ondigitalocean.app
         scope: RUN_TIME
-        type: general
+        type: GENERAL
 
   - name: web
     github:
@@ -114,4 +114,4 @@ services:
       - key: REACT_APP_BACKEND_URL
         value: https://sea-lion-app-gpcie.ondigitalocean.app
         scope: BUILD_TIME
-        type: general
+        type: GENERAL
