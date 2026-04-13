@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { API } from '@/config';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 const USER_AVATAR_FALLBACK =
   'data:image/svg+xml;charset=utf-8,' +
@@ -49,6 +50,8 @@ const UserDashboard = () => {
   const [userProfileForm, setUserProfileForm] = useState({ name: '', phone: '', picture: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [myInvitations, setMyInvitations] = useState([]);
+  const { notifications, unreadCount, markRead } = useRealtimeNotifications(user?.role === 'user');
 
   const fetchMyComplaints = useCallback(async () => {
     try {
@@ -62,6 +65,27 @@ const UserDashboard = () => {
     }
   }, []);
 
+  const fetchBookings = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/bookings`, {
+        withCredentials: true
+      });
+      setBookings(response.data);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    }
+  }, []);
+
+  const fetchMyInvitations = useCallback(async () => {
+    if (user?.role !== 'user') return;
+    try {
+      const { data } = await axios.get(`${API}/locality/invitations/mine`);
+      setMyInvitations(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+    }
+  }, [user?.role]);
+
   useEffect(() => {
     if (user?.role && user.role !== 'user') {
       const dashboardMap = {
@@ -74,25 +98,15 @@ const UserDashboard = () => {
     }
     if (user?.role === 'user') {
       fetchBookings();
+      fetchMyInvitations();
     }
-  }, [user, navigate]);
+  }, [user, navigate, fetchBookings, fetchMyInvitations]);
 
   useEffect(() => {
     if (user?.role !== 'user' || !user?.user_id) return;
     checkAuth();
     fetchMyComplaints();
   }, [user?.user_id, user?.role, checkAuth, fetchMyComplaints]);
-
-  const fetchBookings = async () => {
-    try {
-      const response = await axios.get(`${API}/bookings`, {
-        withCredentials: true
-      });
-      setBookings(response.data);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-    }
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -309,6 +323,8 @@ const UserDashboard = () => {
             <TabsTrigger value="past" data-testid="past-tab">Past Bookings</TabsTrigger>
             <TabsTrigger value="referrals">Referrals</TabsTrigger>
             <TabsTrigger value="support">Complaints</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications ({unreadCount})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-6">
@@ -322,7 +338,7 @@ const UserDashboard = () => {
                     className="bg-blue-600 text-white hover:bg-blue-700 rounded-md"
                     data-testid="browse-trainers-button"
                   >
-                    Browse Trainers
+                    Select Apartment & Browse Trainers
                   </Button>
                 </CardContent>
               </Card>
@@ -525,6 +541,67 @@ const UserDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="invitations" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Trainer invitations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {myInvitations.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No invitations sent yet.</p>
+                ) : (
+                  <ul className="space-y-3 text-sm">
+                    {myInvitations.map((inv) => (
+                      <li key={inv.invitation_id} className="rounded border border-zinc-200 p-3">
+                        <p>
+                          {inv.date} {inv.start_time} - {inv.end_time}
+                        </p>
+                        <p className="text-zinc-600">Status: {inv.status}</p>
+                        {inv.booking_id ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2"
+                            onClick={() => navigate(`/booking/${inv.booking_id}`)}
+                          >
+                            View class details
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="notifications" className="mt-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Realtime notifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No notifications yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {notifications.map((n) => (
+                      <li key={n.notification_id} className="rounded border border-zinc-200 p-3">
+                        <p className="font-medium">{n.title}</p>
+                        <p className="text-sm text-zinc-600">{n.body}</p>
+                        {!n.is_read ? (
+                          <Button size="sm" variant="outline" className="mt-2" onClick={() => markRead(n.notification_id)}>
+                            Mark read
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

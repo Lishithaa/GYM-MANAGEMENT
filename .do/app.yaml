@@ -1,10 +1,10 @@
-# DigitalOcean App Platform — import this repo or run: doctl apps create --spec .do/app.yaml
-# Replace github.repo with your org/repo if different. Branch is set to Develop (screenshot).
+# DigitalOcean App Platform — import or: doctl apps update --spec .do/app.yaml
 #
-# After first deploy, set the web service BUILD_TIME env REACT_APP_BACKEND_URL to your app URL
-# (same origin if using ingress below), e.g. https://hourlygym-xxxxx.ondigitalocean.app
+# Ingress: browser → same hostname; / and SPA routes → web (React); /api → api (FastAPI).
+# If your default hostname changes, update the same https://… URL in FRONTEND_URL, PUBLIC_BACKEND_URL,
+# CORS_ORIGINS, and REACT_APP_BACKEND_URL below.
 #
-# Name must match: ^[a-z][a-z0-9-]{0,30}[a-z0-9]$
+# Secrets (set in UI or doctl, never commit): DATABASE_URL, JWT_SECRET
 
 name: hourlygym
 region: nyc
@@ -17,6 +17,30 @@ ingress:
     - match:
         path:
           prefix: /api
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /docs
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /redoc
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /openapi.json
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /uploads
       component:
         name: api
         preserve_path_prefix: true
@@ -56,6 +80,19 @@ services:
         value: "1"
         scope: RUN_TIME
         type: general
+      # Same-origin SPA + API (override in UI if you use a custom domain)
+      - key: FRONTEND_URL
+        value: https://sea-lion-app-gpcie.ondigitalocean.app
+        scope: RUN_TIME
+        type: general
+      - key: PUBLIC_BACKEND_URL
+        value: https://sea-lion-app-gpcie.ondigitalocean.app
+        scope: RUN_TIME
+        type: general
+      - key: CORS_ORIGINS
+        value: https://sea-lion-app-gpcie.ondigitalocean.app
+        scope: RUN_TIME
+        type: general
 
   - name: web
     github:
@@ -68,8 +105,8 @@ services:
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
-      # Set after API URL is known, or use same-origin app URL for combined ingress.
+      # Must match public app URL (config.js builds API = BACKEND_URL + /api)
       - key: REACT_APP_BACKEND_URL
-        value: https://REPLACE_WITH_YOUR_APP_PUBLIC_URL
+        value: https://sea-lion-app-gpcie.ondigitalocean.app
         scope: BUILD_TIME
         type: general

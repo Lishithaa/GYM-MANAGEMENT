@@ -29,6 +29,18 @@ Environment variables (backend)
 Set in App Platform: DATABASE_URL, JWT_SECRET, CORS_ORIGINS, FRONTEND_URL, PUBLIC_BACKEND_URL,
 SendGrid/Razorpay keys as needed (see backend/.env.example).
 
+DATABASE_URL (required)
+-----------------------
+The API will not start if this is missing or invalid.
+
+- DigitalOcean Managed PostgreSQL: paste the connection string as-is (postgresql://... or postgres://...).
+  The app rewrites it to postgresql+asyncpg:// and maps ?sslmode=require to TLS.
+- DigitalOcean Managed MySQL: use mysql:// or mysql+aiomysql:// (see backend/.env.example).
+- If the URL has no sslmode but TLS is still required, set DATABASE_SSL=true.
+
+If you switch from MySQL to Postgres (or the reverse), run migrations / recreate schema as needed;
+this change only fixes the connection driver and URL parsing.
+
 Health checks
 -------------
 GET /health and GET /api/health both return {"status":"ok"} for gateways and probes.

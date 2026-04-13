@@ -22,6 +22,7 @@ import { API } from '@/config';
 
 const emptyPromoForm = { code: '', discount_percent: '', max_uses: '', valid_until: '' };
 const emptyNewUserForm = { email: '', password: '', name: '', role: 'user', phone: '' };
+const emptyLocationForm = { city: '', locality: '', name: '', lat: '', lng: '' };
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -41,6 +42,8 @@ const AdminDashboard = () => {
   const [adminComplaints, setAdminComplaints] = useState([]);
   const [newUserForm, setNewUserForm] = useState(emptyNewUserForm);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [apartments, setApartments] = useState([]);
+  const [locationForm, setLocationForm] = useState(emptyLocationForm);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -126,6 +129,15 @@ const AdminDashboard = () => {
     }
   }, []);
 
+  const fetchApartments = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API}/locality/apartments`, { params: { limit: 100 } });
+      setApartments(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching apartments:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (user?.role !== 'admin') {
       navigate('/dashboard');
@@ -139,6 +151,7 @@ const AdminDashboard = () => {
     fetchManagedTrainers();
     fetchPartnerRequests();
     fetchAdminComplaints();
+    fetchApartments();
   }, [
     user,
     navigate,
@@ -150,6 +163,7 @@ const AdminDashboard = () => {
     fetchManagedTrainers,
     fetchPartnerRequests,
     fetchAdminComplaints,
+    fetchApartments,
   ]);
 
   const refreshAll = () => {
@@ -161,6 +175,41 @@ const AdminDashboard = () => {
     fetchManagedTrainers();
     fetchPartnerRequests();
     fetchAdminComplaints();
+    fetchApartments();
+  };
+
+  const createApartment = async (e) => {
+    e.preventDefault();
+    if (!locationForm.city.trim() || !locationForm.locality.trim() || !locationForm.name.trim()) {
+      toast.error('City, locality and apartment name are required');
+      return;
+    }
+    try {
+      await axios.post(`${API}/locality/admin/apartments`, {
+        city: locationForm.city.trim(),
+        locality: locationForm.locality.trim(),
+        name: locationForm.name.trim(),
+        lat: locationForm.lat ? parseFloat(locationForm.lat) : null,
+        lng: locationForm.lng ? parseFloat(locationForm.lng) : null,
+        is_active: true,
+      });
+      setLocationForm(emptyLocationForm);
+      toast.success('Apartment/location added');
+      fetchApartments();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Could not add apartment');
+    }
+  };
+
+  const toggleApartmentActive = async (row) => {
+    try {
+      await axios.patch(`${API}/locality/admin/apartments/${row.apartment_id}`, {
+        is_active: !row.is_active,
+      });
+      fetchApartments();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Update failed');
+    }
   };
 
   const approveLegacyTrainer = async (trainerId) => {
@@ -467,6 +516,7 @@ const AdminDashboard = () => {
               <AlertCircle className="w-4 h-4 mr-1 inline" />
               Complaints
             </TabsTrigger>
+            <TabsTrigger value="locations">Locations</TabsTrigger>
           </TabsList>
 
           <TabsContent value="onboarding" className="mt-6 space-y-10">
@@ -951,6 +1001,70 @@ const AdminDashboard = () => {
                             Reopen
                           </Button>
                         </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="locations" className="mt-6 space-y-6">
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Add apartment/locality</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={createApartment} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                  <div>
+                    <Label>City</Label>
+                    <Input value={locationForm.city} onChange={(e) => setLocationForm((f) => ({ ...f, city: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Locality</Label>
+                    <Input
+                      value={locationForm.locality}
+                      onChange={(e) => setLocationForm((f) => ({ ...f, locality: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Apartment name</Label>
+                    <Input value={locationForm.name} onChange={(e) => setLocationForm((f) => ({ ...f, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Lat (optional)</Label>
+                    <Input value={locationForm.lat} onChange={(e) => setLocationForm((f) => ({ ...f, lat: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Lng (optional)</Label>
+                    <Input value={locationForm.lng} onChange={(e) => setLocationForm((f) => ({ ...f, lng: e.target.value }))} />
+                  </div>
+                  <Button type="submit" className="md:col-span-5 w-full md:w-auto">
+                    Add location
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-zinc-200">
+              <CardHeader>
+                <CardTitle>Managed locations ({apartments.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {apartments.length === 0 ? (
+                  <p className="text-sm text-zinc-600">No locations added yet.</p>
+                ) : (
+                  <ul className="divide-y divide-zinc-200 text-sm">
+                    {apartments.map((a) => (
+                      <li key={a.apartment_id} className="py-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{a.name}</p>
+                          <p className="text-zinc-600">
+                            {a.locality}, {a.city}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => toggleApartmentActive(a)}>
+                          {a.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
                       </li>
                     ))}
                   </ul>

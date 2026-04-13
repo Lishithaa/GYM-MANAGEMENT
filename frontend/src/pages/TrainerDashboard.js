@@ -18,6 +18,7 @@ import { TrainerShowcaseCard } from '@/components/TrainerShowcaseCard';
 import { CityPicker } from '@/components/CityPicker';
 import { AreaPicker } from '@/components/AreaPicker';
 import { parseCitiesResponse } from '@/utils/parseCitiesResponse';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 const WHAT_YOU_TEACH_OPTIONS = [
   'Fat Loss',
@@ -117,6 +118,9 @@ const TrainerDashboard = () => {
     video_intro: '',
     declaration_accepted: false
   });
+  const [localityApartments, setLocalityApartments] = useState([]);
+  const [trainerInvitations, setTrainerInvitations] = useState([]);
+  const { notifications, unreadCount, markRead } = useRealtimeNotifications(user?.role === 'trainer');
 
   const fetchMyProfile = useCallback(async () => {
     try {
@@ -196,6 +200,26 @@ const TrainerDashboard = () => {
     }
   }, [myProfile?.trainer_id]);
 
+  const fetchLocalityApartments = useCallback(async () => {
+    if (user?.role !== 'trainer') return;
+    try {
+      const { data } = await axios.get(`${API}/locality/trainer/my-apartments`);
+      setLocalityApartments(Array.isArray(data?.apartments) ? data.apartments : []);
+    } catch (error) {
+      console.error('Error fetching locality apartments:', error);
+    }
+  }, [user?.role]);
+
+  const fetchTrainerInvitations = useCallback(async () => {
+    if (user?.role !== 'trainer') return;
+    try {
+      const { data } = await axios.get(`${API}/locality/invitations/mine`);
+      setTrainerInvitations(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching trainer invitations:', error);
+    }
+  }, [user?.role]);
+
   const calculateEarnings = useCallback(() => {
     const total = bookings
       .filter(b => b.status === 'confirmed')
@@ -220,7 +244,9 @@ const TrainerDashboard = () => {
     fetchMyProfile();
     fetchVerificationStatus();
     fetchCities();
-  }, [user, navigate, fetchMyProfile, fetchVerificationStatus]);
+    fetchLocalityApartments();
+    fetchTrainerInvitations();
+  }, [user, navigate, fetchMyProfile, fetchVerificationStatus, fetchCities, fetchLocalityApartments, fetchTrainerInvitations]);
 
   useEffect(() => {
     if (myProfile) {
@@ -339,7 +365,7 @@ const TrainerDashboard = () => {
   }, [user?.role, fetchMyProfile, fetchVerificationStatus]);
 
   useEffect(() => {
-    if (user?.role !== 'trainer' || !myProfile || myProfile.approved) return undefined;
+    if (user?.role !== 'trainer' || !myProfile?.trainer_id || myProfile?.approved) return undefined;
     const id = setInterval(() => {
       fetchMyProfile();
       fetchVerificationStatus();
@@ -603,6 +629,29 @@ const TrainerDashboard = () => {
     }
   };
 
+  const toggleApartmentOpt = async (apartmentId, shouldOptIn) => {
+    try {
+      await axios.post(
+        `${API}/locality/trainer/apartments/${apartmentId}/${shouldOptIn ? 'opt-in' : 'opt-out'}`
+      );
+      toast.success(shouldOptIn ? 'Opted for location' : 'Removed location');
+      fetchLocalityApartments();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not update preference');
+    }
+  };
+
+  const decideInvitation = async (invitationId, accept) => {
+    try {
+      await axios.post(`${API}/locality/invitations/${invitationId}/decision`, { accept });
+      toast.success(accept ? 'Invitation accepted. Booking request created.' : 'Invitation rejected');
+      fetchTrainerInvitations();
+      fetchBookings();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not process invitation');
+    }
+  };
+
   const trainerStatusCopy = () => {
     if (isTrainerApproved) {
       return {
@@ -761,6 +810,8 @@ const TrainerDashboard = () => {
                   <MessageSquareWarning className="w-4 h-4 mr-1 inline" />
                   Support
                 </TabsTrigger>
+                <TabsTrigger value="locality">Locality & invites</TabsTrigger>
+                <TabsTrigger value="notifications">Notifications ({unreadCount})</TabsTrigger>
               </TabsList>
 
               <TabsContent value="profile" className="mt-6">
@@ -1079,6 +1130,101 @@ const TrainerDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="locality" className="mt-6 space-y-6">
+                <Card className="border-zinc-200">
+                  <CardHeader>
+                    <CardTitle>Opt into apartments/localities</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {localityApartments.length === 0 ? (
+                      <p className="text-sm text-zinc-600">No admin locations published yet.</p>
+                    ) : (
+                      <ul className="divide-y divide-zinc-200">
+                        {localityApartments.map((a) => {
+                          const opted = a.opted === true;
+                          return (
+                            <li key={a.apartment_id} className="py-3 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{a.name}</p>
+                                <p className="text-sm text-zinc-600">
+                                  {a.locality}, {a.city}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant={opted ? 'outline' : 'default'}
+                                onClick={() => toggleApartmentOpt(a.apartment_id, !opted)}
+                              >
+                                {opted ? 'Opt-out' : 'Opt-in'}
+                              </Button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="border-zinc-200">
+                  <CardHeader>
+                    <CardTitle>Pending invitations</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {trainerInvitations.length === 0 ? (
+                      <p className="text-sm text-zinc-600">No invitations yet.</p>
+                    ) : (
+                      <ul className="space-y-3">
+                        {trainerInvitations.map((inv) => (
+                          <li key={inv.invitation_id} className="rounded border border-zinc-200 p-3 text-sm space-y-2">
+                            <p>
+                              {inv.date} {inv.start_time}-{inv.end_time} · Amount: ₹{inv.amount}
+                            </p>
+                            <p className="text-zinc-600">Status: {inv.status}</p>
+                            {inv.note ? <p className="text-zinc-600">Note: {inv.note}</p> : null}
+                            {inv.status === 'pending' ? (
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => decideInvitation(inv.invitation_id, true)}>
+                                  Accept
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => decideInvitation(inv.invitation_id, false)}>
+                                  Reject
+                                </Button>
+                              </div>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="notifications" className="mt-6">
+                <Card className="border-zinc-200">
+                  <CardHeader>
+                    <CardTitle>Realtime updates</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-zinc-600">No notifications yet.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {notifications.map((n) => (
+                          <li key={n.notification_id} className="border border-zinc-200 rounded p-3">
+                            <p className="font-medium">{n.title}</p>
+                            <p className="text-sm text-zinc-600">{n.body}</p>
+                            {!n.is_read ? (
+                              <Button size="sm" variant="outline" className="mt-2" onClick={() => markRead(n.notification_id)}>
+                                Mark read
+                              </Button>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </>
