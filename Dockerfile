@@ -1,5 +1,6 @@
-# HourlyGym API — build from monorepo root (DigitalOcean App Platform, Fly.io, etc.)
-# For docker compose with context ./backend, use backend/Dockerfile instead.
+# HourlyGym API only (monorepo root). For docker compose use backend/Dockerfile.
+# DigitalOcean: use .do/app.yaml (api + web + ingress). Do not deploy this Dockerfile alone
+# as the only component if you need the React UI on the same domain.
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app

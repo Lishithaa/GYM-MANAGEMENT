@@ -1,12 +1,17 @@
-# DigitalOcean App Platform — import or: doctl apps update --spec .do/app.yaml
+# DigitalOcean App Platform — full stack (React + FastAPI on one hostname).
 #
-# Ingress: browser → same hostname; / and SPA routes → web (React); /api → api (FastAPI).
-# If your default hostname changes, update the same https://… URL in FRONTEND_URL, PUBLIC_BACKEND_URL,
-# CORS_ORIGINS, and REACT_APP_BACKEND_URL below.
+# APPLY THIS SPEC (replaces a single-service API-only deploy from repo-root Dockerfile):
+#   1) Apps → your app → Settings → App spec → Edit, paste this entire file, Save.
+#   2) Or: doctl apps update <APP_ID> --spec .do/app.yaml
+# If the app has a managed DB or other components not listed below, merge those stanzas
+# into the spec in the UI before saving so they are not removed.
 #
-# Secrets (set in UI or doctl, never commit): DATABASE_URL, JWT_SECRET
+# After deploy: / and /login → web (nginx); /api, /docs, /uploads, /health → api.
+# If the default .ondigitalocean.app URL changes, update every https://… below the same way.
+#
+# Secrets (UI or doctl only, never commit): DATABASE_URL, JWT_SECRET
 
-name: hourlygym
+name: gym-management
 region: nyc
 
 features:

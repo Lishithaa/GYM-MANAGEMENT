@@ -29,6 +29,13 @@ Optional overrides: `docker-compose.override.yml` (gitignored) or shell env vars
 
 Root `package.json` exposes `npm run docker:up` / `docker:down` as aliases to Compose.
 
+## DigitalOcean App Platform
+
+Deploy **both** UI and API with [`.do/app.yaml`](.do/app.yaml) (two services + ingress). A single component built from the repo-root `Dockerfile` is API-only and will not serve the React app on `/`.
+
+- **UI:** Apps → your app → **Settings** → **App spec** → paste the YAML from `.do/app.yaml`, save (merge in any existing database component if needed).
+- **CLI:** `DO_APP_ID=<uuid> ./scripts/do-apply-app-spec.sh` (requires [doctl](https://docs.digitalocean.com/reference/doctl/how-to/install/)).
+
 ### Docker: BuildKit `metadata_v2.db` / `containerdmeta.db` I/O error
 
 That comes from **Docker Desktop’s disk image** (full, corrupted, or bad I/O), not from this repo.
