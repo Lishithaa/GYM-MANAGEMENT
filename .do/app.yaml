@@ -110,6 +110,11 @@ services:
     http_port: 80
     instance_count: 1
     instance_size_slug: basic-xxs
+    health_check:
+      http_path: /
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
     envs:
       # Must match public app URL (config.js builds API = BACKEND_URL + /api)
       - key: REACT_APP_BACKEND_URL
